@@ -10,17 +10,15 @@ train_annotations:
   type: pandas.CSVDataset
   filepath: data/01_raw/Train.csv
 
-image_root:
-  type: PartitionedDataSet
-  dataset:
-    type: kedro_datasets.image.ImageDataSet
-  path: data/01_raw
-
 yolo_dataset:
   type: MemoryDataset
 
+model_output_path:
+  type: kedro_datasets.text.TextDataset
+  filepath: data/06_models/yolov8_trained.pt
+
 trained_model_output:
-  type: TextDataset
+  type: kedro_datasets.text.TextDataset
   filepath: data/06_models/yolov8_trained.pt
 
 map50_score:

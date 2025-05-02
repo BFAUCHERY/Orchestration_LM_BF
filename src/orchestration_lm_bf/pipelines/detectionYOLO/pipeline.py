@@ -4,18 +4,17 @@ generated using Kedro 0.19.12
 """
 
 from kedro.pipeline import node, Pipeline, pipeline  # noqa
+from .nodes import load_data, preprocess_data, train_yolov8, evaluate_yolov8
 
 
 def create_pipeline(**kwargs) -> Pipeline:
-    from kedro.pipeline import Pipeline, node, pipeline
-    from .nodes import load_data, preprocess_data, train_yolov8, evaluate_yolov8
 
     return pipeline([
         node(
             func=load_data,
-            inputs=dict(
+                inputs=dict(
                 test_csv_path="train_annotations",
-                image_dir="image_root"
+                image_dir="params:image_root"
             ),
             outputs="annotations_df",
             name="load_data_node"
