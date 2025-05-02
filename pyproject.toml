@@ -1,0 +1,30 @@
+[build-system]
+requires = [ "setuptools",]
+build-backend = "setuptools.build_meta"
+
+[project]
+requires-python = ">=3.9"
+name = "orchestration_lm_bf"
+readme = "README.md"
+dynamic = [ "version",]
+dependencies = [ "ipython>=8.10", "jupyterlab>=3.0", "notebook", "kedro~=0.19.12",]
+
+[project.scripts]
+orchestration-lm-bf = "orchestration_lm_bf.__main__:main"
+
+[tool.kedro]
+package_name = "orchestration_lm_bf"
+project_name = "Orchestration_LM_BF"
+kedro_init_version = "0.19.12"
+tools = "['None']"
+example_pipeline = "False"
+source_dir = "src"
+
+[project.entry-points."kedro.hooks"]
+
+[tool.setuptools.dynamic.version]
+attr = "orchestration_lm_bf.__version__"
+
+[tool.setuptools.packages.find]
+where = [ "src",]
+namespaces = false
