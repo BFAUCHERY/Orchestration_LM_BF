@@ -5,30 +5,3 @@
 
 raw_images:
   type: MemoryDataset
-
-params:
-  image_base_path: data/01_raw
-  ocr_language: fra
-
-train_annotations:
-  type: pandas.CSVDataset
-  filepath: data/01_raw/Train.csv
-
-annotations_df:
-  type: pandas.CSVDataset
-  filepath: data/01_raw/annotations_df.csv
-
-yolo_dataset:
-  type: MemoryDataset
-
-model_output_path:
-  type: kedro_datasets.text.TextDataset
-  filepath: data/06_models/yolov8_trained.pt
-
-trained_model_output:
-  type: kedro_datasets.text.TextDataset
-  filepath: data/06_models/yolov8_trained.pt
-
-map50_score:
-  type: kedro_datasets.json.JSONDataset
-  filepath: data/08_reporting/map50.json
