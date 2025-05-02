@@ -6,14 +6,13 @@ from ultralytics import YOLO
 from sklearn.model_selection import train_test_split
 
 
-def load_data(test_csv_path: str, image_dir: str) -> pd.DataFrame:
+def load_data(train_csv:pd.DataFrame, image_dir: str) -> pd.DataFrame:
     """
     Charge les annotations et les chemins d'images depuis le fichier CSV de test.
     """
-    df = pd.read_csv(test_csv_path)
-    df["full_path"] = df["Path"].apply(lambda p: os.path.join(image_dir, p))
+    train_csv["full_path"] = train_csv["Path"].apply(lambda p: os.path.join(image_dir, p))
 
-    return df
+    return train_csv
 
 
 def preprocess_data(df: pd.DataFrame, output_dir: str) -> None:

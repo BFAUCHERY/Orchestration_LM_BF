@@ -10,6 +10,10 @@ train_annotations:
   type: pandas.CSVDataset
   filepath: data/01_raw/Train.csv
 
+annotations_df:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/annotations_df.csv
+
 yolo_dataset:
   type: MemoryDataset
 
