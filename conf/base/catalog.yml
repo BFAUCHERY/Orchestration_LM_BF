@@ -5,3 +5,19 @@
 
 raw_images:
   type: MemoryDataset
+
+train_images:
+  type: yaml.YAMLDataset
+  filepath: data/01_raw/data.yaml
+
+yolo_data_path:
+  type: pandas.CSVDataset  # ou MemoryDataSet si pas de fichier
+  filepath: /tmp/yolo_data_path.csv  # peut être un dummy, Kedro a besoin d’un output
+
+trained_model:
+  type: pickle.PickleDataset
+  filepath: data/02_model/yolo_model.pkl
+
+evaluation_metrics:
+  type: json.JSONDataset
+  filepath: data/02_model/eval_metrics.json
