@@ -6,6 +6,10 @@
 raw_images:
   type: MemoryDataset
 
+params:
+  image_base_path: data/01_raw
+  ocr_language: fra
+
 train_annotations:
   type: pandas.CSVDataset
   filepath: data/01_raw/Train.csv
