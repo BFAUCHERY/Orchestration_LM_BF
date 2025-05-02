@@ -5,7 +5,7 @@ def create_pipeline(**kwargs) -> Pipeline:
     return pipeline([
         node(
             func=train_yolo,
-            inputs="train_images",
+            inputs="params:yolo_yaml_path",
             outputs="trained_model",
             name="train_yolo_node"
         ),
