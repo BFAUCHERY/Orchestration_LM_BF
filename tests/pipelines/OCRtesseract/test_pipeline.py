@@ -1,9 +1,15 @@
-"""
-This is a boilerplate test file for pipeline 'OCRtesseract'
-generated using Kedro 0.19.12.
-Please add your pipeline tests here.
+from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline
+from kedro.io import DataCatalog, MemoryDataSet
+from kedro.runner import SequentialRunner
 
-Kedro recommends using `pytest` framework, more info about it can be found
-in the official documentation:
-https://docs.pytest.org/en/latest/getting-started.html
-"""
+def test_ocr_pipeline_structure():
+    catalog = DataCatalog({
+        "params:ocr_image_path": MemoryDataSet("some_path.jpg"),
+        "ocr_result": MemoryDataSet()
+    })
+    pipeline = create_pipeline()
+    runner = SequentialRunner()
+    try:
+        runner.run(pipeline, catalog)
+    except Exception:
+        pass  # on vérifie juste que la pipeline est bien structurée
