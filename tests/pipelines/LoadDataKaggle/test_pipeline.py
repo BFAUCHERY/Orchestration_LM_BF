@@ -69,3 +69,18 @@ def test_load_and_prepare_gtsrb_data_handles_corrupt(monkeypatch, tmp_path):
 
     result = load_and_prepare_gtsrb_data()
     assert result == {}
+
+def test_load_and_prepare_gtsrb_data_zip_not_exist(monkeypatch, tmp_path):
+    # Simuler absence de zip après téléchargement
+    class MockKaggleAPI:
+        def dataset_download_files(self, *args, **kwargs):
+            pass  # ne crée pas de zip
+
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.kaggle.api", MockKaggleAPI())
+
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.os.path.exists", lambda path: False)
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.glob.glob", lambda *args, **kwargs: [])
+    
+    result = load_and_prepare_gtsrb_data()
+    assert isinstance(result, dict)
+    assert result == {}
