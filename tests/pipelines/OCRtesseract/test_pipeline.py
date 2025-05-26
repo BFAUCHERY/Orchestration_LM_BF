@@ -1,14 +1,10 @@
+import os
 import pytest
 from unittest.mock import MagicMock, patch
 from PIL import Image
 import numpy as np
-from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline
 
-def test_ocr_pipeline_structure():
-    pipeline = create_pipeline()
-    assert pipeline is not None
-    assert len(pipeline.nodes) > 0
-    
+from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline
 from orchestration_lm_bf.pipelines.OCRtesseract.nodes import (
     configure_tesseract,
     get_detections,
@@ -16,7 +12,13 @@ from orchestration_lm_bf.pipelines.OCRtesseract.nodes import (
     evaluate_ocr
 )
 
-def test_configure_tesseract_sets_env():
+def test_ocr_pipeline_structure():
+    pipeline = create_pipeline()
+    assert pipeline is not None
+    assert len(pipeline.nodes) > 0
+
+def test_configure_tesseract_sets_env(monkeypatch):
+    monkeypatch.setenv("TESSERACT_CMD", "/usr/bin/tesseract")
     config = configure_tesseract()
     assert isinstance(config, dict)
     assert 'lang' in config
@@ -51,7 +53,8 @@ def test_prepare_ocr_data(mock_open):
     assert len(crops) == 1
     assert isinstance(crops[0], Image.Image)
 
-def test_evaluate_ocr_real_stop():
+def test_evaluate_ocr_real_stop(monkeypatch):
+    monkeypatch.setenv("TESSERACT_CMD", "/usr/bin/tesseract")
     img = Image.open("tests/test_data/stop.png")
     crops = [img.crop((10, 10, 100, 100))]
     tess_config = {'lang': 'eng', 'config': '--psm 6'}
