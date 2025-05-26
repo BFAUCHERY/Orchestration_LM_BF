@@ -44,7 +44,7 @@ def test_prepare_ocr_data(mock_open):
     mock_open.return_value = fake_img
 
     detections = [{
-        "image_path": "tests/test_data/stop.jpg",
+        "image_path": "tests/test_data/stop.png",
         "bbox": [10, 10, 100, 100]
     }]
     crops = prepare_ocr_data(detections)
@@ -52,7 +52,7 @@ def test_prepare_ocr_data(mock_open):
     assert isinstance(crops[0], Image.Image)
 
 def test_evaluate_ocr_real_stop():
-    img = Image.open("tests/test_data/stop.jpg")
+    img = Image.open("tests/test_data/stop.png")
     crops = [img.crop((10, 10, 100, 100))]
     tess_config = {'lang': 'eng', 'config': '--psm 6'}
     ground_truths = ["STOP"]
