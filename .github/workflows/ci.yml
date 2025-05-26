@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=src --cov-fail-under=80
+          PYTHONPATH=src pytest tests/ --cov=src --cov-fail-under=80
 
       - name: Build Docker image
         run: |
