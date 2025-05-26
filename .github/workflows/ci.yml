@@ -26,6 +26,12 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
+      - name: Configure Kaggle API credentials
+        run: |
+          mkdir -p ~/.kaggle
+          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+
       - name: Run tests with coverage
         run: |
           PYTHONPATH=src pytest tests/ --cov=src --cov-fail-under=80
