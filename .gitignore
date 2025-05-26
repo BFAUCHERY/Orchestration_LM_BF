@@ -164,3 +164,11 @@ mlruns/*
 data/*
 
 roboflow_upload/
+
+venv310/
+.venv/
+.venv310/
+venv*/
+.env/
+.venv/
+env/
