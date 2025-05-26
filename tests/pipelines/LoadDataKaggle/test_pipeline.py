@@ -84,3 +84,37 @@ def test_load_and_prepare_gtsrb_data_zip_not_exist(monkeypatch, tmp_path):
     result = load_and_prepare_gtsrb_data()
     assert isinstance(result, dict)
     assert result == {}
+
+
+# Test that the zip file is removed after extraction
+def test_load_and_prepare_gtsrb_data_removes_zip(monkeypatch, tmp_path):
+    class MockKaggleAPI:
+        def dataset_download_files(self, *args, **kwargs):
+            zip_path = tmp_path / "traffic-sign-gtrb.zip"
+            with open(zip_path, "wb") as f:
+                f.write(b"fake zip content")
+
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.kaggle.api", MockKaggleAPI())
+
+    class MockZipFile:
+        def __init__(self, file, mode='r'):
+            self.file = file
+        def extractall(self, path):
+            (Path(path) / "train").mkdir(parents=True, exist_ok=True)
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc_val, exc_tb): pass
+
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.zipfile.ZipFile", MockZipFile)
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.glob.glob", lambda *args, **kwargs: [])
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.cv2.imread", lambda path: [[255]])
+
+    zip_path = tmp_path / "traffic-sign-gtrb.zip"
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.os.path.exists", lambda path: True if path == str(zip_path) else False)
+    removed_paths = []
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.os.remove", lambda path: removed_paths.append(path))
+
+    from orchestration_lm_bf.pipelines.LoadDataKaggle.nodes import load_and_prepare_gtsrb_data
+    result = load_and_prepare_gtsrb_data()
+
+    assert isinstance(result, dict)
+    assert zip_path.name in [os.path.basename(p) for p in removed_paths]
