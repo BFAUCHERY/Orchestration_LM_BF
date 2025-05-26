@@ -109,7 +109,7 @@ def test_load_and_prepare_gtsrb_data_removes_zip(monkeypatch, tmp_path):
     monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.cv2.imread", lambda path: [[255]])
 
     zip_path = tmp_path / "traffic-sign-gtrb.zip"
-    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.os.path.exists", lambda path: True if path == str(zip_path) else False)
+    monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.os.path.exists", lambda path: True)
     removed_paths = []
     monkeypatch.setattr("orchestration_lm_bf.pipelines.LoadDataKaggle.nodes.os.remove", lambda path: removed_paths.append(path))
 
