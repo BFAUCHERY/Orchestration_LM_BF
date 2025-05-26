@@ -9,6 +9,9 @@ RUN pip install uv
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
 
+RUN apt-get update && apt-get install -y tesseract-ocr
+ENV TESSERACT_CMD=/usr/bin/tesseract
+
 # add kedro user
 ARG KEDRO_UID=999
 ARG KEDRO_GID=0

@@ -4,10 +4,18 @@ from pathlib import Path
 from jiwer import cer
 import os
 
+import platform
+
 def configure_tesseract():
-    tessdata_dir = "C:/Users/benoit.fauchery/AppData/Local/Programs/Tesseract-OCR/tessdata"
-    os.environ['TESSDATA_PREFIX'] = tessdata_dir
-    pytesseract.pytesseract.tesseract_cmd = 'C:/Users/benoit.fauchery/AppData/Local/Programs/Tesseract-OCR/tesseract.exe'
+    custom_path = os.getenv("TESSERACT_CMD")
+    if custom_path:
+        pytesseract.pytesseract.tesseract_cmd = custom_path
+    elif platform.system() == "Darwin":  # macOS
+        pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
+    elif platform.system() == "Windows":
+        tessdata_dir = "C:/Program Files/Tesseract-OCR/tessdata"
+        os.environ['TESSDATA_PREFIX'] = tessdata_dir
+        pytesseract.pytesseract.tesseract_cmd = "C:/Program Files/Tesseract-OCR/tesseract.exe"
 
     return {'lang': 'eng', 'config': '--psm 6'}
 

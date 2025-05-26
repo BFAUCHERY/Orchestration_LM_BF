@@ -19,6 +19,12 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install tesseract
+        run: sudo apt-get install -y tesseract-ocr
+
+      - name: Set env for Tesseract
+        run: echo "TESSERACT_CMD=/usr/bin/tesseract" >> $GITHUB_ENV
+        
       - name: Install dependencies
         run: |
           sudo apt-get update
