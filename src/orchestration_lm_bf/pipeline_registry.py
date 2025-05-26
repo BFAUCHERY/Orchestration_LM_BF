@@ -5,6 +5,7 @@ from kedro.framework.project import find_pipelines
 from kedro.pipeline import Pipeline
 from orchestration_lm_bf.pipelines.LoadDataKaggle import pipeline as LoadDataKaggle
 from orchestration_lm_bf.pipelines.detectionYOLO import pipeline as detectionYOLO
+from orchestration_lm_bf.pipelines.evaluateYOLO import pipeline as evaluateYOLO
 from orchestration_lm_bf.pipelines.OCRtesseract import pipeline as OCRtesseract
 
 
@@ -17,6 +18,7 @@ def register_pipelines() -> dict[str, Pipeline]:
     pipelines = find_pipelines()
     pipelines["LoadDataKaggle"] = LoadDataKaggle.create_pipeline()
     pipelines["detectionYOLO"] = detectionYOLO.create_pipeline()
+    pipelines["evaluateYOLO"] = evaluateYOLO.create_pipeline()
     pipelines["OCRtesseract"] = OCRtesseract.create_pipeline()
     pipelines["__default__"] = sum(pipelines.values())
     return pipelines
