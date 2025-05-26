@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyseur de Panneaux de Signalisation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border: 3px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+
+        .upload-section.dragover {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #495057;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            background: #0056b3;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .result-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .category-interdiction { background: #dc3545; }
+        .category-obligation { background: #007bff; }
+        .category-danger { background: #fd7e14; }
+        .category-indication { background: #28a745; }
+        .category-priorite { background: #6f42c1; }
+
+        .result-info h3 {
+            color: #495057;
+            margin-bottom: 5px;
+        }
+
+        .result-info p {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .detected-text {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-align: center;
+            color: #495057;
+        }
+
+        .confidence-bar {
+            background: #e9ecef;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.5s ease;
+        }
+
+        .image-preview {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .detail-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .detail-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .upload-section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚦 Analyseur de Panneaux</h1>
+            <p>Uploadez une image de panneau de signalisation pour obtenir sa catégorie et le texte détecté</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📷</div>
+                <div class="upload-text">Glissez-déposez votre image ici ou cliquez pour sélectionner</div>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    Choisir une image
+                </button>
+                <input type="file" id="fileInput" class="file-input" accept="image/*">
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyse de l'image en cours...</p>
+            </div>
+
+            <div class="results" id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+
+        // Gestion du drag & drop
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // Gestion du clic sur la zone d'upload
+        uploadSection.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Gestion de la sélection de fichier
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('Veuillez sélectionner un fichier image valide.');
+                return;
+            }
+
+            if (file.size > 16 * 1024 * 1024) {
+                showError('Le fichier est trop volumineux (max 16MB).');
+                return;
+            }
+
+            analyzeImage(file);
+        }
+
+        function analyzeImage(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            // Afficher le loading
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            uploadSection.style.display = 'none';
+
+            fetch('/api/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                uploadSection.style.display = 'block';
+                
+                if (data.success) {
+                    showResults(data);
+                } else {
+                    showError(data.error || 'Erreur lors de l\'analyse');
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                uploadSection.style.display = 'block';
+                showError('Erreur de connexion: ' + error.message);
+            });
+        }
+
+        function showResults(data) {
+            const result = data.result;
+            const categoryClass = `category-${result.category}`;
+            
+            results.innerHTML = `
+                <div class="success">
+                    ✅ Analyse terminée avec succès !
+                </div>
+                
+                ${data.image_preview ? `
+                <div class="image-preview">
+                    <img src="${data.image_preview}" alt="Image analysée" class="preview-img">
+                </div>
+                ` : ''}
+                
+                <div class="result-card">
+                    <div class="result-header">
+                        <div class="result-icon ${categoryClass}">🚦</div>
+                        <div class="result-info">
+                            <h3>${result.category_name}</h3>
+                            <p>${result.category_description}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="detected-text">
+                        "${result.detected_text}"
+                    </div>
+                    
+                    <div>
+                        <strong>Niveau de confiance:</strong>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${result.confidence * 100}%"></div>
+                        </div>
+                        <span>${(result.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <div class="detail-value">${result.analysis_details.text_regions_found}</div>
+                            <div class="detail-label">Régions de texte</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">${result.analysis_details.processing_time_ms}ms</div>
+                            <div class="detail-label">Temps de traitement</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">${result.category.toUpperCase()}</div>
+                            <div class="detail-label">Code catégorie</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            results.style.display = 'block';
+        }
+
+        function showError(message) {
+            results.innerHTML = `
+                <div class="error">
+                    ❌ ${message}
+                </div>
+            `;
+            results.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
