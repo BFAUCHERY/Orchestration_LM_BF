@@ -2,7 +2,13 @@ import pytest
 from unittest.mock import MagicMock, patch
 from PIL import Image
 import numpy as np
+from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline
 
+def test_ocr_pipeline_structure():
+    pipeline = create_pipeline()
+    assert pipeline is not None
+    assert len(pipeline.nodes) > 0
+    
 from orchestration_lm_bf.pipelines.OCRtesseract.nodes import (
     configure_tesseract,
     get_detections,

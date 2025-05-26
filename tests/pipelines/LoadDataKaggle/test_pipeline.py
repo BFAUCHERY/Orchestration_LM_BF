@@ -3,6 +3,12 @@ import os
 import numpy as np
 from unittest import mock
 from orchestration_lm_bf.pipelines.LoadDataKaggle.nodes import load_and_prepare_gtsrb_data
+from orchestration_lm_bf.pipelines.LoadDataKaggle.pipeline import create_pipeline
+
+def test_LoadDataKaggle_pipeline_structure():
+    pipeline = create_pipeline()
+    assert pipeline is not None
+    assert len(pipeline.nodes) > 0
 
 def test_load_and_prepare_gtsrb_data(monkeypatch, tmp_path):
     # Simule l'appel à l'API Kaggle pour éviter un vrai téléchargement

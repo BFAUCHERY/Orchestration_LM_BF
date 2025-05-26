@@ -1,6 +1,12 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from orchestration_lm_bf.pipelines.evaluateYOLO.nodes import evaluate_yolov8_10
+from orchestration_lm_bf.pipelines.evaluateYOLO.pipeline import create_pipeline
+
+def test_evaluateYOLO_pipeline_structure():
+    pipeline = create_pipeline()
+    assert pipeline is not None
+    assert len(pipeline.nodes) > 0
 
 @patch("orchestration_lm_bf.pipelines.evaluateYOLO.nodes.YOLO")
 def test_evaluate_yolov8_10_mock(mock_yolo_class):
