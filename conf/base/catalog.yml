@@ -21,3 +21,36 @@ trained_model:
 evaluation_metrics:
   type: json.JSONDataset
   filepath: data/02_model/eval_metrics.json
+
+input_image:
+  type: pillow.ImageDataset
+  filepath: data/01_raw/images/test/00000.png
+
+crops:
+  type: pickle.PickleDataset
+  filepath: data/04_feature/crops.pkl
+
+ocr_texts:
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/ocr_texts.pkl
+
+tess_config:
+  type: pickle.PickleDataset
+  filepath: data/02_intermediate/tess_config.pkl
+
+ocr_evaluation:
+  type: json.JSONDataset
+  filepath: data/06_models/ocr_evaluation.json
+
+detections:
+  type: pickle.PickleDataset
+  filepath: data/03_primary/detected_panels.pkl
+
+model:
+  type: orchestration_lm_bf.datasets.yolo_model_dataset.YOLOModelDataset
+  filepath: model/best.pt
+
+model_yolo:
+  type: orchestration_lm_bf.datasets.yolo_model_dataset.YOLOModelDataset
+  filepath: data/yolov8n.pt
+  
