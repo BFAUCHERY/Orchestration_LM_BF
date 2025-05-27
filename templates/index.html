@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analyseur de Panneaux de Signalisation</title>
+    <title>Analyseur de Panneaux - Local vs API</title>
     <style>
         * {
             margin: 0;
@@ -28,7 +28,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -43,6 +43,85 @@
         .header p {
             font-size: 1.1rem;
             opacity: 0.9;
+        }
+
+        .mode-selector {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .mode-toggle {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-container {
+            position: relative;
+            display: inline-block;
+            width: 120px;
+            height: 50px;
+        }
+
+        .toggle-input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #667eea;
+            transition: .4s;
+            border-radius: 50px;
+            overflow: hidden;
+        }
+        
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 40px;
+            width: 40px;
+            left: 5px;
+            bottom: 5px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        .toggle-input:checked + .toggle-slider {
+            background: #764ba2;
+        }
+
+        .toggle-input:checked + .toggle-slider:before {
+            transform: translateX(65px);
+        }
+
+        .mode-info {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-info.local {
+            background: #e3f2fd;
+            border-left: 4px solid #667eea;
+        }
+
+        .mode-info.api {
+            background: #f3e5f5;
+            border-left: 4px solid #764ba2;
         }
 
         .main-content {
@@ -61,13 +140,14 @@
         }
 
         .upload-section:hover {
-            border-color: #007bff;
+            border-color: #667eea;
             background: #e3f2fd;
+            transform: translateY(-2px);
         }
 
         .upload-section.dragover {
-            border-color: #28a745;
-            background: #d4edda;
+            border-color: #764ba2;
+            background: #f3e5f5;
         }
 
         .upload-icon {
@@ -87,18 +167,19 @@
         }
 
         .upload-btn {
-            background: #007bff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 12px 30px;
             border: none;
             border-radius: 25px;
             font-size: 1rem;
             cursor: pointer;
-            transition: background 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         .upload-btn:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
 
         .loading {
@@ -109,7 +190,7 @@
 
         .spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #007bff;
+            border-top: 4px solid #667eea;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -127,47 +208,77 @@
             margin-top: 30px;
         }
 
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
         .result-card {
             background: white;
             border: 1px solid #dee2e6;
             border-radius: 15px;
             padding: 25px;
-            margin-bottom: 20px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.08);
         }
 
-        .result-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
+        .mode-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
         }
 
-        .result-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            font-size: 1.5rem;
-            color: white;
+        .mode-badge.local {
+            background: #e3f2fd;
+            color: #667eea;
         }
 
-        .category-interdiction { background: #dc3545; }
-        .category-obligation { background: #007bff; }
-        .category-danger { background: #fd7e14; }
-        .category-indication { background: #28a745; }
-        .category-priorite { background: #6f42c1; }
+        .mode-badge.api {
+            background: #f3e5f5;
+            color: #764ba2;
+        }
 
-        .result-info h3 {
-            color: #495057;
+        .prediction-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .prediction-class {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #333;
             margin-bottom: 5px;
         }
 
-        .result-info p {
-            color: #6c757d;
+        .prediction-confidence {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .prediction-coords {
             font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .image-container h3 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+
+        .image-display {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 10px;
         }
 
         .detected-text {
@@ -196,16 +307,30 @@
             transition: width 0.5s ease;
         }
 
-        .image-preview {
-            text-align: center;
-            margin: 20px 0;
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
         }
 
-        .preview-img {
-            max-width: 100%;
-            max-height: 300px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        .detail-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .detail-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .detail-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
         }
 
         .error {
@@ -226,33 +351,11 @@
             border: 1px solid #c3e6cb;
         }
 
-        .details-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .detail-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .detail-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #007bff;
-        }
-
-        .detail-label {
-            font-size: 0.9rem;
-            color: #6c757d;
-            margin-top: 5px;
-        }
-
         @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+            
             .header h1 {
                 font-size: 2rem;
             }
@@ -271,14 +374,31 @@
     <div class="container">
         <div class="header">
             <h1>🚦 Analyseur de Panneaux</h1>
-            <p>Uploadez une image de panneau de signalisation pour obtenir sa catégorie et le texte détecté</p>
+            <p>Choisissez entre le modèle local ou l'API Roboflow pour analyser vos panneaux</p>
+        </div>
+
+        <div class="mode-selector">
+            <div class="mode-toggle">
+                <span style="font-weight: bold; color: #667eea;">LOCAL</span>
+                <label class="toggle-container">
+                    <input type="checkbox" class="toggle-input" id="modeToggle">
+                    <span class="toggle-slider">
+                    </span>
+                </label>
+                <span style="font-weight: bold; color: #764ba2;">API</span>
+            </div>
+
+            <div class="mode-info local" id="modeInfo">
+                <h3>🖥️ Mode Local</h3>
+                <p>Utilise vos pipelines Kedro locaux (YOLO + OCR). Plus rapide, fonctionne hors ligne.</p>
+            </div>
         </div>
 
         <div class="main-content">
             <div class="upload-section" id="uploadSection">
                 <div class="upload-icon">📷</div>
                 <div class="upload-text">Glissez-déposez votre image ici ou cliquez pour sélectionner</div>
-                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                <button class="upload-btn" id="uploadBtn">
                     Choisir une image
                 </button>
                 <input type="file" id="fileInput" class="file-input" accept="image/*">
@@ -286,7 +406,7 @@
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>Analyse de l'image en cours...</p>
+                <p id="loadingText">Analyse de l'image en cours...</p>
             </div>
 
             <div class="results" id="results"></div>
@@ -294,10 +414,45 @@
     </div>
 
     <script>
+        let currentMode = 'local';
+        
+        // Éléments DOM
+        const modeToggle = document.getElementById('modeToggle');
+        const modeInfo = document.getElementById('modeInfo');
         const uploadSection = document.getElementById('uploadSection');
         const fileInput = document.getElementById('fileInput');
         const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loadingText');
         const results = document.getElementById('results');
+
+        const uploadBtn = document.getElementById('uploadBtn');
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Gestion du toggle mode
+        modeToggle.addEventListener('change', function() {
+            currentMode = this.checked ? 'api' : 'local';
+            updateModeInfo();
+        });
+
+        function updateModeInfo() {
+            if (currentMode === 'local') {
+                modeInfo.className = 'mode-info local';
+                modeInfo.innerHTML = `
+                    <h3>🖥️ Mode Local</h3>
+                    <p>Utilise vos pipelines Kedro locaux (YOLO + OCR). Plus rapide, fonctionne hors ligne.</p>
+                `;
+                loadingText.textContent = 'Analyse locale en cours (YOLO + OCR)...';
+            } else {
+                modeInfo.className = 'mode-info api';
+                modeInfo.innerHTML = `
+                    <h3>🌐 Mode API Roboflow</h3>
+                    <p>Utilise l'API Roboflow en ligne. Modèle spécialisé, requiert une connexion internet.</p>
+                `;
+                loadingText.textContent = 'Analyse via API Roboflow en cours...';
+            }
+        }
 
         // Gestion du drag & drop
         uploadSection.addEventListener('dragover', (e) => {
@@ -318,19 +473,20 @@
             }
         });
 
-        // Gestion du clic sur la zone d'upload
-        uploadSection.addEventListener('click', () => {
-            fileInput.click();
-        });
 
-        // Gestion de la sélection de fichier
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
+                // Réinitialiser l'input pour permettre de sélectionner le même fichier
+                e.target.value = '';
             }
         });
 
         function handleFile(file) {
+            // Réinitialiser les résultats précédents
+            results.style.display = 'none';
+            results.innerHTML = '';
+            
             if (!file.type.startsWith('image/')) {
                 showError('Veuillez sélectionner un fichier image valide.');
                 return;
@@ -342,22 +498,30 @@
             }
 
             analyzeImage(file);
+            fileInput.value = '';
         }
 
         function analyzeImage(file) {
             const formData = new FormData();
             formData.append('image', file);
+            formData.append('mode', currentMode);
 
             // Afficher le loading
             loading.style.display = 'block';
             results.style.display = 'none';
+            results.innerHTML = '';  // Nettoyer les anciens résultats
             uploadSection.style.display = 'none';
 
-            fetch('/api/analyze', {
+            fetch('/predict', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 loading.style.display = 'none';
                 uploadSection.style.display = 'block';
@@ -376,67 +540,134 @@
         }
 
         function showResults(data) {
-            const result = data.result;
-            const categoryClass = `category-${result.category}`;
-            
-            results.innerHTML = `
+            let resultsHTML = `
                 <div class="success">
                     ✅ Analyse terminée avec succès !
-                </div>
-                
-                ${data.image_preview ? `
-                <div class="image-preview">
-                    <img src="${data.image_preview}" alt="Image analysée" class="preview-img">
-                </div>
-                ` : ''}
-                
-                <div class="result-card">
-                    <div class="result-header">
-                        <div class="result-icon ${categoryClass}">🚦</div>
-                        <div class="result-info">
-                            <h3>${result.category_name}</h3>
-                            <p>${result.category_description}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="detected-text">
-                        "${result.detected_text}"
-                    </div>
-                    
-                    <div>
-                        <strong>Niveau de confiance:</strong>
-                        <div class="confidence-bar">
-                            <div class="confidence-fill" style="width: ${result.confidence * 100}%"></div>
-                        </div>
-                        <span>${(result.confidence * 100).toFixed(1)}%</span>
-                    </div>
-                    
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <div class="detail-value">${result.analysis_details.text_regions_found}</div>
-                            <div class="detail-label">Régions de texte</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value">${result.analysis_details.processing_time_ms}ms</div>
-                            <div class="detail-label">Temps de traitement</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value">${result.category.toUpperCase()}</div>
-                            <div class="detail-label">Code catégorie</div>
-                        </div>
-                    </div>
+                    <span class="mode-badge ${data.mode}">${data.mode.toUpperCase()}</span>
                 </div>
             `;
-            
+
+            if (data.mode === 'local') {
+                // Affichage pour le mode local
+                const result = data.result;
+                
+                resultsHTML += `
+                    <div class="results-grid">
+                        ${data.image_preview ? `
+                        <div class="result-card">
+                            <h3>Image analysée</h3>
+                            <img src="${data.image_preview}" alt="Image analysée" class="image-display">
+                        </div>
+                        ` : ''}
+                        
+                        <div class="result-card">
+                            <h3>Résultats de l'analyse</h3>
+                            
+                            <div class="detected-text">
+                                "${result.detected_text}"
+                            </div>
+                            
+                            <div>
+                                <strong>Catégorie détectée:</strong> ${result.category}<br>
+                                <strong>Niveau de confiance:</strong>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${result.confidence * 100}%"></div>
+                                </div>
+                                <span>${(result.confidence * 100).toFixed(1)}%</span>
+                            </div>
+                            
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="detail-value">${result.analysis_details.text_regions_found}</div>
+                                    <div class="detail-label">Régions de texte</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-value">${result.analysis_details.processing_time_ms}ms</div>
+                                    <div class="detail-label">Temps de traitement</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Affichage pour le mode API
+                const predictions = data.predictions || [];
+                
+                resultsHTML += `
+                    <div class="results-grid">
+                        ${data.annotated_image ? `
+                        <div class="result-card">
+                            <h3>🖼️ Image avec détections</h3>
+                            <img src="data:image/jpeg;base64,${data.annotated_image}" alt="Image annotée" class="image-display">
+                        </div>
+                        ` : ''}
+                        
+                        <div class="result-card">
+                            <h3>📊 Détections Roboflow</h3>
+                            <p><strong>Nombre total de détections:</strong> ${data.total_detections || predictions.length}</p>
+                            <p><strong>Temps d'inférence:</strong> ${(data.inference_time * 1000).toFixed(0)}ms</p>
+                            
+                            ${predictions.length > 0 ? `
+                                <div style="margin-top: 20px;">
+                                    ${predictions.map((pred, index) => `
+                                        <div class="prediction-item">
+                                            <div class="prediction-class">
+                                                ${index + 1}. ${pred.class || 'Classe inconnue'}
+                                            </div>
+                                            <div class="prediction-confidence">
+                                                Confiance: ${(pred.confidence * 100).toFixed(1)}%
+                                            </div>
+                                            <div class="prediction-coords">
+                                                Position: (${Math.round(pred.x)}, ${Math.round(pred.y)}) 
+                                                - Taille: ${Math.round(pred.width)}×${Math.round(pred.height)}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : '<p>Aucune détection trouvée.</p>'}
+                        </div>
+                        
+                        ${data.best_detection && !data.annotated_image ? `
+                        <div class="result-card">
+                            <h3>🏆 Meilleure détection</h3>
+                            <div class="detected-text">${data.best_detection.class}</div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${data.best_detection.confidence * 100}%"></div>
+                            </div>
+                            <p>Confiance: ${(data.best_detection.confidence * 100).toFixed(1)}%</p>
+                            
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="detail-value">${Math.round(data.best_detection.bbox.x)}</div>
+                                    <div class="detail-label">Position X</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-value">${Math.round(data.best_detection.bbox.y)}</div>
+                                    <div class="detail-label">Position Y</div>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            results.innerHTML = resultsHTML;
             results.style.display = 'block';
         }
 
+        resultsHTML += `<div style="text-align:center;"><button class="upload-btn" onclick="resetUI()">🔁 Analyser une autre image</button></div>`;
+
+        function resetUI() {
+            results.style.display = 'none';
+            results.innerHTML = '';
+            fileInput.value = '';
+            uploadSection.style.display = 'block';
+            loading.style.display = 'none';
+        }
+        
         function showError(message) {
-            results.innerHTML = `
-                <div class="error">
-                    ❌ ${message}
-                </div>
-            `;
+            results.innerHTML = `<div class="error">❌ ${message}</div>`;
             results.style.display = 'block';
         }
     </script>

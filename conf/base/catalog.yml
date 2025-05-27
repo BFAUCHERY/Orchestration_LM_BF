@@ -53,4 +53,8 @@ model:
 model_yolo:
   type: orchestration_lm_bf.datasets.yolo_model_dataset.YOLOModelDataset
   filepath: data/yolov8n.pt
+
+roboflow_predictions:
+  type: json.JSONDataset
+  filepath: data/05_pred_API/roboflow_predictions.json
   

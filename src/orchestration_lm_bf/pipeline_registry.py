@@ -16,9 +16,18 @@ def register_pipelines() -> dict[str, Pipeline]:
         A mapping from pipeline names to ``Pipeline`` objects.
     """
     pipelines = find_pipelines()
+
     pipelines["LoadDataKaggle"] = LoadDataKaggle.create_pipeline()
     pipelines["detectionYOLO"] = detectionYOLO.create_pipeline()
     pipelines["evaluateYOLO"] = evaluateYOLO.create_pipeline()
     pipelines["OCRtesseract"] = OCRtesseract.create_pipeline()
-    pipelines["__default__"] = sum(pipelines.values())
+
+    pipelines["local_pipeline"] = (
+        pipelines["LoadDataKaggle"]
+        + pipelines["detectionYOLO"]
+        + pipelines["evaluateYOLO"]
+        + pipelines["OCRtesseract"]
+    )
+
+    pipelines["__default__"] = pipelines["local_pipeline"]
     return pipelines

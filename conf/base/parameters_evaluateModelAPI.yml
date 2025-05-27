@@ -1,0 +1,19 @@
+# This is a boilerplate parameters config generated for pipeline 'evaluateModelAPI'
+# using Kedro 0.19.12.
+#
+# Documentation for this file format can be found in "Parameters"
+# Link: https://docs.kedro.org/en/0.19.12/configuration/parameters.html
+api_key: "XDn3ZffdMQJCAvokyyG1"
+roboflow_confidence_threshold: 0.5
+roboflow_overlap_threshold: 0.5
+image_folder: "data/04_eval_API"  # Dossier contenant vos images
+project_id: "graduation_project"    # ID de votre projet
+model_version: "1"                  # Version du modèle
+confidence: 0.5
+
+# Paramètres pour l'API Roboflow
+# Pour un dossier d'images (comportement original)
+image_source: "data/04_eval_API/"
+
+# Paramètres pour le mode web
+image_folder: "data/04_eval_API/"  # Pour compatibilité
