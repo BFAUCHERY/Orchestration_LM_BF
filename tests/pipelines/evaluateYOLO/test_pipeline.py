@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from orchestration_lm_bf.pipelines.evaluateYOLO.nodes import evaluate_yolov8_10, predict_yolo
 from orchestration_lm_bf.pipelines.evaluateYOLO.pipeline import create_pipeline
+import numpy as np
 
 
 def test_evaluateYOLO_pipeline_structure():
@@ -29,9 +30,10 @@ def test_evaluate_yolov8_10_returns_metrics_dict():
 def test_predict_yolo_returns_predictions():
     with patch("orchestration_lm_bf.pipelines.evaluateYOLO.nodes.YOLO") as mock_yolo_class:
         mock_result = MagicMock()
-        mock_result.boxes.xyxy.cpu().numpy.return_value = [[0, 0, 100, 100]]
-        mock_result.boxes.conf.cpu().numpy.return_value = [0.95]
-        mock_result.boxes.cls.cpu().numpy.return_value = [1]
+        mock_result.boxes.xyxy.cpu().numpy.return_value = np.array([[0, 0, 100, 100]])
+        mock_result.boxes.conf.cpu().numpy.return_value = np.array([0.95])
+        mock_result.boxes.cls.cpu().numpy.return_value = np.array([1])
+        mock_result.names = {1: "class_name"}
 
         mock_model = MagicMock()
         mock_model.predict.return_value = [mock_result]
@@ -44,4 +46,3 @@ def test_predict_yolo_returns_predictions():
         assert "boxes" in predictions[0]
         assert "scores" in predictions[0]
         assert "classes" in predictions[0]
-        #Ludo est gay
