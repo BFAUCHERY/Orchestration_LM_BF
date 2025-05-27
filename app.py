@@ -292,6 +292,10 @@ def health_check():
         'modes': ['local', 'api']
     })
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"}), 200
+
 @app.route('/predict', methods=['POST'])
 def predict():
     print("\n🔍 Nouvelle requête reçue sur /predict")

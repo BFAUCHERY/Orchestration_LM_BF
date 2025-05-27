@@ -29,6 +29,6 @@ ARG KEDRO_UID=999
 ARG KEDRO_GID=0
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
 
-EXPOSE 8888
+EXPOSE 5001
 
 CMD ["python", "app.py"]
