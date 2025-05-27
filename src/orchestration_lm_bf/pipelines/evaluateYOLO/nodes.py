@@ -36,15 +36,18 @@ def predict_yolo(model_path: str, image_path: str) -> list:
     # On peut transformer les résultats pour ne retourner que ce qui est nécessaire
     predictions = []
     for result in results:
-        print(result)
         boxes = result.boxes.xyxy.cpu().numpy().tolist()  # coordonnées des bounding boxes
         scores = result.boxes.conf.cpu().numpy().tolist()  # scores de confiance
         classes = result.boxes.cls.cpu().numpy().tolist()  # classes prédites
+        category_names = []
+
+        for i in range(len(classes)):
+            category_names.append(result.names[int(classes[i])])  # noms des classes
         
         predictions.append({
             "boxes": boxes,
             "scores": scores,
-            "classes": classes
+            "classes": category_names
         })
     
     return predictions

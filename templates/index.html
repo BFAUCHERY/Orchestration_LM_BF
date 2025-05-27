@@ -569,11 +569,17 @@
                             
                             <div>
                                 <strong>Catégorie détectée:</strong> ${result.category}<br>
-                                <strong>Niveau de confiance:</strong>
+                                <strong>Niveau de confiance (catégorie):</strong>
                                 <div class="confidence-bar">
-                                    <div class="confidence-fill" style="width: ${result.confidence * 100}%"></div>
+                                    <div class="confidence-fill" style="width: ${result.confidence_yolo * 100}%"></div>
                                 </div>
-                                <span>${(result.confidence * 100).toFixed(1)}%</span>
+                                <span>${(result.confidence_yolo * 100).toFixed(1)}%</span>
+                                <br>
+                                <strong>Niveau de confiance (texte):</strong>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${result.confidence_ocr * 100}%"></div>
+                                </div>
+                                <span>${(result.confidence_ocr * 100).toFixed(1)}%</span>
                             </div>
                             
                             <div class="details-grid">

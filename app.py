@@ -55,11 +55,13 @@ def analyze_sign_local():
             data = json.load(f) 
 
         all_classes = []
+        confidences = []
         for item in data:
             all_classes.extend(item.get('classes', [])) 
-
-        if all_classes:
+            confidences.extend(item.get('scores', []))
+        if all_classes and confidences :
             category = all_classes[0]
+            confidence = confidences[0]
         else:
             category = "Aucune classe trouvée."
         
@@ -83,7 +85,8 @@ def analyze_sign_local():
             'category_name': f"Détection {category}",
             'category_description': f"Panneau détecté par YOLO: {category}",
             'detected_text': detected_text[0]['text'][0]['text'],
-            'confidence': detected_text[0]['text'][0]["confidence"],
+            'confidence_yolo': confidence,
+            'confidence_ocr': detected_text[0]['text'][0]["confidence"],
             'analysis_details': {
                 'image_processed': True,
                 'text_regions_found': random.randint(1, 3),
