@@ -1,14 +1,7 @@
-name: MLOpsPipeline
-
-on:
-  push:
-    branches: ["develop"]
-  pull_request:
-    branches: ["develop"]
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
