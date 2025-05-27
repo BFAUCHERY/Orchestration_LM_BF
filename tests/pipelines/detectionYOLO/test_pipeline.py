@@ -14,8 +14,12 @@ def test_train_yolo_mock(mock_yolo_class):
     mock_model = MagicMock()
     mock_yolo_class.return_value = mock_model
 
+    print("TEST: Mocking YOLO training - this should not run actual training.")
     # Appelle la fonction avec un chemin fictif
     model_path = train_yolo("fake_data.yaml")
+
+    # Vérifie que YOLO a bien été instancié avec le bon fichier
+    mock_yolo_class.assert_called_once_with("data/yolov8n.pt")
 
     # Vérifie que train() a été appelé avec les bons arguments
     mock_model.train.assert_called_once_with(
@@ -26,6 +30,7 @@ def test_train_yolo_mock(mock_yolo_class):
         device="cpu",
         patience=0
     )
+    print("TEST: Training function was mocked successfully.")
 
     # Vérifie que le chemin retourné est correct
     assert model_path == "data/model.pt"
