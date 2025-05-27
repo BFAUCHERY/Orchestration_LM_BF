@@ -11,6 +11,7 @@ import json
 import requests
 import shutil
 import sys
+import time
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -40,6 +41,8 @@ def analyze_sign_local():
     Analyse locale avec vos pipelines Kedro existants
     Basée sur l'ancien code qui fonctionnait
     """
+    start_time = time.perf_counter()
+    
     try:
         print("🖥️ Lancement de la pipeline evaluateYOLO...")
         
@@ -66,26 +69,25 @@ def analyze_sign_local():
             print("🔍 Lancement OCRtesseract...")
             run_pipelines(["OCRtesseract"])
             
-            ocr_path = 'data/08_outputs/ocr_text.txt'
+            ocr_path = 'data/08_outputs/ocr_output.json'
             with open(ocr_path, 'r', encoding='utf-8') as f:
-                detected_text = f.read().strip()
+                detected_text = json.load(f)
         except Exception as e:
             print(f"⚠️ OCR non disponible: {e}")
             # Continuer sans OCR
         
-        # Simulation du niveau de confiance
-        confidence = round(random.uniform(0.75, 0.98), 2)
+        processing_time_ms = int((time.perf_counter() - start_time) * 1000)
         
         return {
             'category': category,
             'category_name': f"Détection {category}",
             'category_description': f"Panneau détecté par YOLO: {category}",
-            'detected_text': detected_text,
-            'confidence': confidence,
+            'detected_text': detected_text[0]['text'][0]['text'],
+            'confidence': detected_text[0]['text'][0]["confidence"],
             'analysis_details': {
                 'image_processed': True,
                 'text_regions_found': random.randint(1, 3),
-                'processing_time_ms': random.randint(150, 800)
+                'processing_time_ms': processing_time_ms
             }
         }
         

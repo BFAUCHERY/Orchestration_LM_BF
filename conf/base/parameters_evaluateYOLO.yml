@@ -5,3 +5,4 @@
 # Link: https://docs.kedro.org/en/0.19.12/configuration/parameters.html
 evaluation_model_path: model/best.pt
 data_yaml_path: data/01_raw/data.yaml
+predict_image_path: data/07_predict/image_to_predict.png

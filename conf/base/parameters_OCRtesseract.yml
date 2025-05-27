@@ -3,4 +3,5 @@
 #
 # Documentation for this file format can be found in "Parameters"
 # Link: https://docs.kedro.org/en/0.19.12/configuration/parameters.html
-images_folder: "data/01_raw/images/sample"
+image_to_predict: "data/07_predict/image_to_predict.png"
+images_folder: "data/07_predict"
