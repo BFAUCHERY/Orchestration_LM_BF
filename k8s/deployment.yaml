@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yolov8-ocr-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolov8-ocr
+  template:
+    metadata:
+      labels:
+        app: yolov8-ocr
+    spec:
+      containers:
+        - name: yolov8-ocr-container
+          image: ludovicmarion/orchestration_lm_bf:latest
+          ports:
+            - containerPort: 5001
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 15
+            periodSeconds: 20

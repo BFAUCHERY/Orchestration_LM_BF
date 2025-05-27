@@ -3,6 +3,7 @@ FROM $BASE_IMAGE as runtime-environment
 
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
+RUN apt-get update && apt-get install -y libgl1
 RUN pip install uv
 
 # install project requirements
