@@ -1,73 +1,58 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
-from werkzeug.utils import secure_filename
+from pathlib import Path
+from flask import Flask, request, jsonify, render_template
 import os
-import uuid
 from PIL import Image
 import io
 import base64
 import random
+from kedro.framework.session import KedroSession
+from kedro.framework.startup import bootstrap_project
+import json
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Créer le dossier uploads s'il n'existe pas
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Initialisation du projet Kedro (permet de charger le contexte du projet)
+bootstrap_project(Path.cwd())
 
 # Extensions autorisées
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
 
-# Catégories de panneaux simulées
-SIGN_CATEGORIES = {
-    'interdiction': {
-        'name': 'Panneau d\'interdiction',
-        'description': 'Panneau rond avec bordure rouge',
-        'examples': ['STOP', 'SENS INTERDIT', 'INTERDICTION DE TOURNER', 'VITESSE LIMITÉE']
-    },
-    'obligation': {
-        'name': 'Panneau d\'obligation',
-        'description': 'Panneau rond bleu',
-        'examples': ['DIRECTION OBLIGATOIRE', 'PISTE CYCLABLE', 'VOIE RÉSERVÉE']
-    },
-    'danger': {
-        'name': 'Panneau de danger',
-        'description': 'Panneau triangulaire avec bordure rouge',
-        'examples': ['VIRAGE DANGEREUX', 'PASSAGE À NIVEAU', 'TRAVAUX', 'ÉCOLE']
-    },
-    'indication': {
-        'name': 'Panneau d\'indication',
-        'description': 'Panneau rectangulaire informatif',
-        'examples': ['SORTIE', 'PARKING', 'HÔPITAL', 'CENTRE VILLE']
-    },
-    'priorite': {
-        'name': 'Panneau de priorité',
-        'description': 'Panneau de priorité et cédez le passage',
-        'examples': ['CÉDEZ LE PASSAGE', 'PRIORITÉ À DROITE', 'ROUTE PRIORITAIRE']
-    }
-}
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def simulate_sign_analysis(image_path):
+def analyze_sign():
     """
     Simule l'analyse d'un panneau de signalisation
     Dans une vraie application, ici on utiliserait un modèle de ML et OCR
     """
-    # Simulation de la classification
-    category_key = random.choice(list(SIGN_CATEGORIES.keys()))
-    category = SIGN_CATEGORIES[category_key]
+    # Classification
+    run_pipelines(["evaluateYOLO"])
     
-    # Simulation de l'extraction de texte
-    detected_text = random.choice(category['examples'])
+    with open('data/08_outputs/yolo_predictions.json', 'r', encoding='utf-8') as f:
+        data = json.load(f) 
+
+    all_classes = []
+    for item in data:
+        all_classes.extend(item.get('classes', [])) 
+
+    if all_classes:
+        category = all_classes[0]
+    else:
+        category = "Aucune classe trouvée."
+    
+    # Extraction du texte
+    run_pipelines(["OCRtesseract"])
+    with open('data/08_outputs/ocr_text.txt', 'r', encoding='utf-8') as f:
+        detected_text = f.read().strip()
     
     # Simulation du niveau de confiance
     confidence = round(random.uniform(0.75, 0.98), 2)
     
     return {
-        'category': category_key,
-        'category_name': category['name'],
-        'category_description': category['description'],
+        'category': category,
+        'category_name': "sample name",
+        'category_description': "sample description",
         'detected_text': detected_text,
         'confidence': confidence,
         'analysis_details': {
@@ -76,6 +61,12 @@ def simulate_sign_analysis(image_path):
             'processing_time_ms': random.randint(150, 800)
         }
     }
+
+def run_pipelines(pipelines):
+    for pipeline_name in pipelines:
+        print(f"Running pipeline: {pipeline_name}")
+        with KedroSession.create("./", Path.cwd()) as session:
+            session.run(pipeline_name=pipeline_name)
 
 @app.route('/')
 def index():
@@ -90,7 +81,7 @@ def health_check():
     })
 
 @app.route('/api/analyze', methods=['POST'])
-def analyze_sign():
+def api_analyze():
     try:
         # Vérifier si un fichier a été envoyé
         if 'image' not in request.files:
@@ -104,11 +95,18 @@ def analyze_sign():
         if not allowed_file(file.filename):
             return jsonify({'error': 'Format de fichier non supporté'}), 400
         
-        # Sauvegarder le fichier temporairement
-        filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # Sauvegarder le fichier
+        filename = "image_to_predict.png"
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        data_folder = os.path.join(project_root, 'data/07_predict/')
+        os.makedirs(data_folder, exist_ok=True)
+        data_folder = os.path.abspath(data_folder)
+        filepath = os.path.join(data_folder, filename)
+        # Supprimer le fichier existant s'il existe déjà
+        if os.path.exists(filepath):
+            os.remove(filepath)
         file.save(filepath)
-        
+        print(f"Fichier sauvegardé à: {filepath}")
         try:
             # Vérifier que c'est bien une image valide
             with Image.open(filepath) as img:
@@ -121,7 +119,7 @@ def analyze_sign():
                 img.thumbnail(max_size, Image.Resampling.LANCZOS)
                 
                 # Analyser l'image (simulation)
-                analysis_result = simulate_sign_analysis(filepath)
+                analysis_result = analyze_sign()
                 
                 # Encoder l'image en base64 pour l'affichage
                 buffer = io.BytesIO()
