@@ -31,11 +31,12 @@ def predict_yolo(model_path: str, image_path: str) -> list:
     model = YOLO(model_path)
     
     # Fait la prédiction
-    results = model.predict(image_path, imgsz=160, device="cpu")
+    results = model.predict(image_path, device="cpu")
     
     # On peut transformer les résultats pour ne retourner que ce qui est nécessaire
     predictions = []
     for result in results:
+        print(result)
         boxes = result.boxes.xyxy.cpu().numpy().tolist()  # coordonnées des bounding boxes
         scores = result.boxes.conf.cpu().numpy().tolist()  # scores de confiance
         classes = result.boxes.cls.cpu().numpy().tolist()  # classes prédites
