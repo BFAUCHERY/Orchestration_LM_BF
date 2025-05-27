@@ -62,8 +62,20 @@ ocr_text:
   type: json.JSONDataset
   filepath: data/08_outputs/ocr_output.json
 
+
 roboflow_predictions_raw:
   type: json.JSONDataset
-  filepath: data/05_pred_API/roboflow_predictions.json
+  filepath: data/05_model_output/roboflow_predictions.json
+  versioned: false
+
+ocr_crops:
+  type: pickle.PickleDataset
+  filepath: data/06_models/ocr_crops.pkl
+  versioned: false
+
+ocr_output:
+  type: json.JSONDataset
+  filepath: data/08_outputs/ocr_output.json
+  versioned: false
 
   

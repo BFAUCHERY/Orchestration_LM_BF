@@ -59,21 +59,29 @@ def analyze_sign_local():
         for item in data:
             all_classes.extend(item.get('classes', [])) 
             confidences.extend(item.get('scores', []))
-        if all_classes and confidences :
+        
+        if all_classes and confidences:
             category = all_classes[0]
             confidence = confidences[0]
         else:
             category = "Aucune classe trouvée."
+            confidence = 0.0
         
         # Extraction du texte avec OCR
         detected_text = "Texte non disponible"
+        confidence_ocr = 0.0
         try:
             print("🔍 Lancement OCRtesseract...")
             run_pipelines(["OCRtesseract"])
             
             ocr_path = 'data/08_outputs/ocr_output.json'
             with open(ocr_path, 'r', encoding='utf-8') as f:
-                detected_text = json.load(f)
+                ocr_data = json.load(f)
+                
+            if ocr_data and len(ocr_data) > 0 and 'text' in ocr_data[0]:
+                if len(ocr_data[0]['text']) > 0:
+                    detected_text = ocr_data[0]['text'][0]['text']
+                    confidence_ocr = ocr_data[0]['text'][0]["confidence"]
         except Exception as e:
             print(f"⚠️ OCR non disponible: {e}")
             # Continuer sans OCR
@@ -84,12 +92,12 @@ def analyze_sign_local():
             'category': category,
             'category_name': f"Détection {category}",
             'category_description': f"Panneau détecté par YOLO: {category}",
-            'detected_text': detected_text[0]['text'][0]['text'],
+            'detected_text': detected_text,
             'confidence_yolo': confidence,
-            'confidence_ocr': detected_text[0]['text'][0]["confidence"],
+            'confidence_ocr': confidence_ocr,
             'analysis_details': {
                 'image_processed': True,
-                'text_regions_found': random.randint(1, 3),
+                'text_regions_found': 1 if detected_text != "Texte non disponible" else 0,
                 'processing_time_ms': processing_time_ms
             }
         }
@@ -101,7 +109,8 @@ def analyze_sign_local():
             'category_name': "Erreur d'analyse",
             'category_description': f"Erreur: {str(e)}",
             'detected_text': "N/A",
-            'confidence': 0.0,
+            'confidence_yolo': 0.0,
+            'confidence_ocr': 0.0,
             'analysis_details': {
                 'image_processed': False,
                 'text_regions_found': 0,
@@ -119,12 +128,12 @@ def analyze_sign_api_direct(image_path):
         # URL de l'API
         url = f"https://detect.roboflow.com/{ROBOFLOW_CONFIG['project_id']}/{ROBOFLOW_CONFIG['model_version']}"
         
-        # Paramètres - IMPORTANT: Ajouter format=image pour obtenir l'image annotée
+        # Paramètres
         params = {
             "api_key": ROBOFLOW_CONFIG['api_key'],
             "confidence": ROBOFLOW_CONFIG['confidence'],
             "overlap": 0.5,
-            "format": "json",  # D'abord obtenir le JSON
+            "format": "json",
         }
         
         # Headers
@@ -142,6 +151,32 @@ def analyze_sign_api_direct(image_path):
         
         result = response.json()
         predictions = result.get("predictions", [])
+        
+        # Sauvegarder les prédictions pour la pipeline OCR
+        roboflow_output_path = 'data/05_model_output/roboflow_predictions.json'
+        os.makedirs(os.path.dirname(roboflow_output_path), exist_ok=True)
+        
+        # Formatter les prédictions pour la pipeline OCR - IMPORTANT: utiliser le bon nom de fichier
+        image_filename = os.path.basename(image_path)  # Utiliser le vrai nom du fichier
+        predictions_formatted = {
+            "predictions_by_image": {
+                image_filename: {  # Utiliser le nom réel du fichier
+                    "predictions": predictions,
+                    "image_info": result.get("image", {}),
+                    "inference_time": result.get("time", 0),
+                    "detection_count": len(predictions)
+                }
+            },
+            "summary": {
+                "total_images_processed": 1,
+                "successful_predictions": 1,
+                "total_detections": len(predictions)
+            },
+            "errors": []
+        }
+        
+        with open(roboflow_output_path, 'w') as f:
+            json.dump(predictions_formatted, f)
         
         # Faire une deuxième requête pour obtenir l'image annotée
         annotated_image_base64 = None
@@ -182,12 +217,8 @@ def analyze_sign_api_direct(image_path):
             'predictions': predictions,
             'inference_time': result.get('time', 0),
             'total_detections': len(predictions),
-            'annotated_image': annotated_image_base64,  # Ajouter l'image annotée
-            'summary': {
-                'total_images_processed': 1,
-                'successful_predictions': 1,
-                'total_detections': len(predictions)
-            }
+            'annotated_image': annotated_image_base64,
+            'summary': predictions_formatted['summary']
         }
         
     except Exception as e:
@@ -201,74 +232,104 @@ def analyze_sign_api_direct(image_path):
 
 def analyze_sign_api(image_path):
     """
-    Analyse avec l'API Roboflow via la pipeline Kedro
+    Analyse avec l'API Roboflow + OCR via les pipelines Kedro
     """
+    start_time = time.perf_counter()
+    
     try:
-        # Vérifier d'abord si la clé API est configurée
-        if ROBOFLOW_CONFIG['api_key'] == 'VOTRE_CLE_API':
-            print("❌ Clé API Roboflow non configurée!")
-            # Utiliser l'approche directe au lieu de Kedro
-            return analyze_sign_api_direct(image_path)
+        # Nettoyer les anciens fichiers de prédictions
+        old_predictions_path = 'data/05_model_output/roboflow_predictions.json'
+        if os.path.exists(old_predictions_path):
+            os.remove(old_predictions_path)
+            print(f"🗑️ Ancien fichier de prédictions supprimé")
         
-        # Essayer d'abord l'approche directe (plus simple)
-        return analyze_sign_api_direct(image_path)
+        # Première étape : Analyse avec Roboflow
+        analysis = analyze_sign_api_direct(image_path)
         
-        # Si vous voulez utiliser Kedro, décommentez le code ci-dessous:
+        if not analysis['success']:
+            return analysis
         
-        print("🌐 Lancement de la pipeline evaluateModelAPI...")
+        # Deuxième étape : OCR sur les détections
+        detected_text = "Texte non disponible"
+        confidence_ocr = 0.0
         
-        # Copier l'image dans le dossier attendu par la pipeline
-        api_image_folder = 'data/01_raw/api_images'
-        os.makedirs(api_image_folder, exist_ok=True)
-        
-        # Supprimer les anciennes images
-        for old_file in os.listdir(api_image_folder):
-            old_path = os.path.join(api_image_folder, old_file)
-            if os.path.isfile(old_path):
-                os.remove(old_path)
-        
-        # Copier l'image avec un nom standard
-        api_image_path = os.path.join(api_image_folder, 'image_to_analyze.png')
-        shutil.copy2(image_path, api_image_path)
-        
-        # Lancer la pipeline Roboflow
-        run_pipelines(["evaluateModelAPI"])
-        
-        # Lire les résultats
-        roboflow_results_path = 'data/05_model_output/roboflow_predictions.json'
-        if os.path.exists(roboflow_results_path):
-            with open(roboflow_results_path, 'r', encoding='utf-8') as f:
-                result = json.load(f)
+        try:
+            print("🔍 Lancement pipeline OCR API...")
             
-            predictions = []
-            inference_time = 0
+            # Vérifier que le fichier de prédictions existe
+            if not os.path.exists(old_predictions_path):
+                print(f"❌ Fichier de prédictions non trouvé: {old_predictions_path}")
+                raise FileNotFoundError("Fichier de prédictions non trouvé")
             
-            # Extraire les prédictions de toutes les images
-            for image_name, image_data in result.get("predictions_by_image", {}).items():
-                predictions.extend(image_data.get("predictions", []))
-                inference_time = max(inference_time, image_data.get("inference_time", 0))
+            # Lancer la pipeline OCR qui utilise les prédictions Roboflow
+            run_pipelines(["ocrAPI"])
+            
+            # Lire les résultats OCR
+            ocr_path = 'data/08_outputs/ocr_output.json'
+            if os.path.exists(ocr_path):
+                with open(ocr_path, 'r', encoding='utf-8') as f:
+                    ocr_data = json.load(f)
                 
-            return {
-                'mode': 'api',
-                'success': True,
-                'predictions': predictions,
-                'inference_time': inference_time,
-                'total_detections': len(predictions),
-                'summary': result.get("summary", {})
-            }
-        else:
-            return {
-                'mode': 'api',
-                'success': False,
-                'error': f'Fichier de résultats non trouvé: {roboflow_results_path}',
-                'predictions': []
-            }
+                # Extraire le texte et la confiance
+                all_texts = []
+                all_confidences = []
+                
+                for crop_results in ocr_data:
+                    if isinstance(crop_results, list):
+                        for text_detection in crop_results:
+                            if 'text' in text_detection and text_detection['text']:
+                                all_texts.append(text_detection['text'])
+                                all_confidences.append(text_detection.get('confidence', 0))
+                
+                if all_texts:
+                    # Prendre le texte avec la meilleure confiance
+                    best_idx = all_confidences.index(max(all_confidences))
+                    detected_text = all_texts[best_idx]
+                    confidence_ocr = all_confidences[best_idx]
+                    print(f"✅ Texte détecté: '{detected_text}' (confiance: {confidence_ocr:.2f})")
             
+        except Exception as e:
+            print(f"⚠️ Erreur OCR: {e}")
+            print(f"⚠️ L'OCR a échoué, mais l'analyse continue sans le texte")
+            # Continuer sans OCR si erreur
+        
+        # Calculer le temps de traitement
+        processing_time_ms = int((time.perf_counter() - start_time) * 1000)
+        
+        # Préparer la réponse finale
+        predictions = analysis.get('predictions', [])
+        
+        # Trouver la meilleure prédiction pour la catégorie
+        category = "Aucune détection"
+        confidence_yolo = 0.0
+        if predictions:
+            best_pred = max(predictions, key=lambda x: x.get('confidence', 0))
+            category = best_pred.get('class', 'unknown')
+            confidence_yolo = best_pred.get('confidence', 0)
+        
+        return {
+            'success': True,
+            'mode': 'api',
+            'predictions': predictions,
+            'inference_time': analysis.get('inference_time', 0),
+            'total_detections': len(predictions),
+            'annotated_image': analysis.get('annotated_image'),
+            'category': category,
+            'detected_text': detected_text,
+            'confidence_yolo': confidence_yolo,
+            'confidence_ocr': confidence_ocr,
+            'analysis_details': {
+                'image_processed': True,
+                'text_regions_found': 1 if detected_text != "Texte non disponible" else 0,
+                'processing_time_ms': processing_time_ms
+            }
+        }
+        
     except Exception as e:
         print(f"❌ Erreur lors de l'analyse API: {e}")
         return {
-            'mode': 'api',
             'success': False,
+            'mode': 'api',
             'error': str(e),
             'predictions': []
         }
@@ -276,7 +337,7 @@ def analyze_sign_api(image_path):
 def run_pipelines(pipelines):
     for pipeline_name in pipelines:
         print(f"Running pipeline: {pipeline_name}")
-        with KedroSession.create("./", Path.cwd()) as session:
+        with KedroSession.create(project_path=Path.cwd()) as session:
             session.run(pipeline_name=pipeline_name)
 
 @app.route('/')
@@ -292,16 +353,11 @@ def health_check():
         'modes': ['local', 'api']
     })
 
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok"}), 200
-
 @app.route('/predict', methods=['POST'])
 def predict():
     print("\n🔍 Nouvelle requête reçue sur /predict")
     
     try:
-        
         # Vérifier si un fichier a été envoyé
         if 'image' not in request.files:
             print("❌ Aucune image dans la requête")
@@ -346,55 +402,20 @@ def predict():
                 
                 # Analyser selon le mode choisi
                 if mode == 'api':
-                    print(f"🌐 Analyse avec l'API Roboflow...")
+                    print(f"🌐 Analyse avec l'API Roboflow + OCR...")
                     analysis_result = analyze_sign_api(filepath)
                     
                     if analysis_result['success']:
-                        predictions = analysis_result['predictions']
+                        # Encoder l'image originale pour l'affichage (si pas d'image annotée)
+                        if not analysis_result.get('annotated_image'):
+                            buffer = io.BytesIO()
+                            img.save(buffer, format='JPEG', quality=85)
+                            img_base64 = base64.b64encode(buffer.getvalue()).decode()
+                            analysis_result['image_preview'] = f"data:image/jpeg;base64,{img_base64}"
                         
-                        # Formater la réponse pour l'interface
-                        response = {
-                            'success': True,
-                            'mode': 'api',
-                            'predictions': predictions,
-                            'inference_time': analysis_result.get('inference_time', 0),
-                            'total_detections': len(predictions),
-                            'filename': file.filename
-                        }
-                        
-                        # Dans la fonction predict(), partie API :
-
-                if mode == 'api':
-                    print(f"🌐 Analyse avec l'API Roboflow...")
-                    analysis_result = analyze_sign_api(filepath)
-                    
-                    if analysis_result['success']:
-                        predictions = analysis_result['predictions']
-                        
-                        # Formater la réponse pour l'interface
-                        response = {
-                            'success': True,
-                            'mode': 'api',
-                            'predictions': predictions,
-                            'inference_time': analysis_result.get('inference_time', 0),
-                            'total_detections': len(predictions),
-                            'filename': file.filename,
-                            'annotated_image': analysis_result.get('annotated_image')  # Ajouter l'image annotée
-                        }
-                        
-                        if predictions:
-                            best_pred = max(predictions, key=lambda x: x.get('confidence', 0))
-                            response['best_detection'] = {
-                                'class': best_pred.get('class', 'unknown'),
-                                'confidence': best_pred.get('confidence', 0),
-                                'bbox': {
-                                    'x': best_pred.get('x', 0),
-                                    'y': best_pred.get('y', 0),
-                                    'width': best_pred.get('width', 0),
-                                    'height': best_pred.get('height', 0)
-                                }
-                            }
-                        print(f"✅ Analyse API réussie: {len(predictions)} détections")
+                        response = analysis_result
+                        response['filename'] = file.filename
+                        print(f"✅ Analyse API réussie")
                     else:
                         response = {
                             'success': False,
@@ -426,19 +447,22 @@ def predict():
                 
         except Exception as e:
             print(f"❌ Erreur lors du traitement: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({
                 'success': False, 
                 'error': f'Erreur lors du traitement de l\'image: {str(e)}'
             }), 400
         
         finally:
-            # Nettoyer le fichier temporaire
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                print(f"🗑️ Fichier temporaire supprimé")
+            # Ne pas supprimer le fichier immédiatement car les pipelines peuvent en avoir besoin
+            # Le supprimer après un délai ou dans un processus de nettoyage séparé
+            pass
     
     except Exception as e:
         print(f"❌ Erreur serveur: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False, 
             'error': f'Erreur serveur: {str(e)}'
@@ -465,18 +489,18 @@ if __name__ == '__main__':
     print("🚦 Démarrage de l'API d'analyse de panneaux de signalisation...")
     print("📍 Interface disponible sur: http://localhost:5001")
     print("🖥️  Mode local: Kedro pipelines")
-    print("🌐 Mode API: Roboflow")
+    print("🌐 Mode API: Roboflow + OCR")
     
     # Vérifier la configuration Roboflow
     if ROBOFLOW_CONFIG['api_key'] == 'VOTRE_CLE_API':
         print("⚠️  ATTENTION: Veuillez configurer votre clé API Roboflow dans ROBOFLOW_CONFIG")
-        print("   L'API fonctionnera en mode démo sans vraie clé")
     else:
         print("✅ Clé API Roboflow configurée")
     
     # Créer les dossiers nécessaires
     os.makedirs('data/07_predict', exist_ok=True)
-    os.makedirs('data/01_raw/api_images', exist_ok=True)
+    os.makedirs('data/05_model_output', exist_ok=True)
+    os.makedirs('data/08_outputs', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
     
-app.run(debug=True, host='127.0.0.1', port=5001)
+    app.run(debug=True, host='127.0.0.1', port=5001)

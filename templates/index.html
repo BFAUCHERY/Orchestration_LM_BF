@@ -85,6 +85,32 @@
             overflow: hidden;
         }
         
+        .toggle-slider span {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            transition: opacity 0.3s ease;
+        }
+        
+        .toggle-slider span:first-child {
+            left: 15px;
+        }
+        
+        .toggle-slider span:last-child {
+            right: 15px;
+            opacity: 0;
+        }
+        
+        .toggle-input:checked + .toggle-slider span:first-child {
+            opacity: 0;
+        }
+        
+        .toggle-input:checked + .toggle-slider span:last-child {
+            opacity: 1;
+        }
 
         .toggle-slider:before {
             position: absolute;
@@ -383,6 +409,8 @@
                 <label class="toggle-container">
                     <input type="checkbox" class="toggle-input" id="modeToggle">
                     <span class="toggle-slider">
+                        <span>LOCAL</span>
+                        <span>API</span>
                     </span>
                 </label>
                 <span style="font-weight: bold; color: #764ba2;">API</span>
@@ -424,8 +452,9 @@
         const loading = document.getElementById('loading');
         const loadingText = document.getElementById('loadingText');
         const results = document.getElementById('results');
-
         const uploadBtn = document.getElementById('uploadBtn');
+
+        // Event listeners
         uploadBtn.addEventListener('click', () => {
             fileInput.click();
         });
@@ -473,7 +502,6 @@
             }
         });
 
-
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
@@ -498,7 +526,6 @@
             }
 
             analyzeImage(file);
-            fileInput.value = '';
         }
 
         function analyzeImage(file) {
@@ -606,54 +633,68 @@
                             <h3>🖼️ Image avec détections</h3>
                             <img src="data:image/jpeg;base64,${data.annotated_image}" alt="Image annotée" class="image-display">
                         </div>
+                        ` : data.image_preview ? `
+                        <div class="result-card">
+                            <h3>Image analysée</h3>
+                            <img src="${data.image_preview}" alt="Image analysée" class="image_display">
+                        </div>
                         ` : ''}
                         
                         <div class="result-card">
-                            <h3>📊 Détections Roboflow</h3>
-                            <p><strong>Nombre total de détections:</strong> ${data.total_detections || predictions.length}</p>
-                            <p><strong>Temps d'inférence:</strong> ${(data.inference_time * 1000).toFixed(0)}ms</p>
+                            <h3>Résultats de l'analyse (API Roboflow)</h3>
                             
-                            ${predictions.length > 0 ? `
-                                <div style="margin-top: 20px;">
-                                    ${predictions.map((pred, index) => `
-                                        <div class="prediction-item">
-                                            <div class="prediction-class">
-                                                ${index + 1}. ${pred.class || 'Classe inconnue'}
-                                            </div>
-                                            <div class="prediction-confidence">
-                                                Confiance: ${(pred.confidence * 100).toFixed(1)}%
-                                            </div>
-                                            <div class="prediction-coords">
-                                                Position: (${Math.round(pred.x)}, ${Math.round(pred.y)}) 
-                                                - Taille: ${Math.round(pred.width)}×${Math.round(pred.height)}
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : '<p>Aucune détection trouvée.</p>'}
-                        </div>
-                        
-                        ${data.best_detection && !data.annotated_image ? `
-                        <div class="result-card">
-                            <h3>🏆 Meilleure détection</h3>
-                            <div class="detected-text">${data.best_detection.class}</div>
-                            <div class="confidence-bar">
-                                <div class="confidence-fill" style="width: ${data.best_detection.confidence * 100}%"></div>
+                            <div class="detected-text">
+                                "${data.detected_text || 'Texte non détecté'}"
                             </div>
-                            <p>Confiance: ${(data.best_detection.confidence * 100).toFixed(1)}%</p>
+                            
+                            <div>
+                                <strong>Catégorie détectée:</strong> ${data.category || 'Aucune détection'}<br>
+                                <strong>Niveau de confiance (catégorie):</strong>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${(data.confidence_yolo || 0) * 100}%"></div>
+                                </div>
+                                <span>${((data.confidence_yolo || 0) * 100).toFixed(1)}%</span>
+                                <br>
+                                <strong>Niveau de confiance (texte):</strong>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${(data.confidence_ocr || 0) * 100}%"></div>
+                                </div>
+                                <span>${((data.confidence_ocr || 0) * 100).toFixed(1)}%</span>
+                            </div>
                             
                             <div class="details-grid">
                                 <div class="detail-item">
-                                    <div class="detail-value">${Math.round(data.best_detection.bbox.x)}</div>
-                                    <div class="detail-label">Position X</div>
+                                    <div class="detail-value">${data.total_detections || 0}</div>
+                                    <div class="detail-label">Détections</div>
                                 </div>
                                 <div class="detail-item">
-                                    <div class="detail-value">${Math.round(data.best_detection.bbox.y)}</div>
-                                    <div class="detail-label">Position Y</div>
+                                    <div class="detail-value">${data.analysis_details ? data.analysis_details.processing_time_ms : 0}ms</div>
+                                    <div class="detail-label">Temps de traitement</div>
                                 </div>
                             </div>
+                            
+                            ${predictions.length > 0 ? `
+                                <details style="margin-top: 20px;">
+                                    <summary style="cursor: pointer; font-weight: bold;">Détails des détections</summary>
+                                    <div style="margin-top: 10px;">
+                                        ${predictions.map((pred, index) => `
+                                            <div class="prediction-item">
+                                                <div class="prediction-class">
+                                                    ${index + 1}. ${pred.class || 'Classe inconnue'}
+                                                </div>
+                                                <div class="prediction-confidence">
+                                                    Confiance: ${(pred.confidence * 100).toFixed(1)}%
+                                                </div>
+                                                <div class="prediction-coords">
+                                                    Position: (${Math.round(pred.x)}, ${Math.round(pred.y)}) 
+                                                    - Taille: ${Math.round(pred.width)}×${Math.round(pred.height)}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </details>
+                            ` : ''}
                         </div>
-                        ` : ''}
                     </div>
                 `;
             }
@@ -662,16 +703,6 @@
             results.style.display = 'block';
         }
 
-        resultsHTML += `<div style="text-align:center;"><button class="upload-btn" onclick="resetUI()">🔁 Analyser une autre image</button></div>`;
-
-        function resetUI() {
-            results.style.display = 'none';
-            results.innerHTML = '';
-            fileInput.value = '';
-            uploadSection.style.display = 'block';
-            loading.style.display = 'none';
-        }
-        
         function showError(message) {
             results.innerHTML = `<div class="error">❌ ${message}</div>`;
             results.style.display = 'block';
