@@ -25,7 +25,7 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
             if None in (x, y, w, h):
                 continue
 
-            padding = 10
+            padding = 5
             x1 = max(int(x - w / 2) - padding, 0)
             y1 = max(int(y - h / 2) - padding, 0)
             x2 = int(x + w / 2) + padding
@@ -38,11 +38,16 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
                 continue
 
             print(f"Crop dimensions: {cropped.shape}")
-            debug_crop_path = f"debug_crop_{i}.jpg"
+            debug_crop_path = os.path.join("data/07_predict", f"crop_{i}_{image_filename}")
             cv2.imwrite(debug_crop_path, cropped)
             print(f"Saved debug crop to: {debug_crop_path}")
 
             crops.append(cropped)
+            try:
+                os.remove(debug_crop_path)
+                print(f"Deleted crop image: {debug_crop_path}")
+            except Exception as e:
+                print(f"Error deleting crop image {debug_crop_path}: {e}")
         try:
             os.remove(image_path)
             print(f"Deleted processed image: {image_path}")
