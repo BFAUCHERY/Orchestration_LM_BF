@@ -13,7 +13,7 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "params:model_version",
                 "params:confidence"
             ],
-            outputs="roboflow_predictions",
+            outputs="roboflow_predictions_raw",
             name="evaluate_model_api_node",
         )
     ])

@@ -4,6 +4,7 @@ import os
 from typing import Dict, Any, List, Union
 import logging
 from pathlib import Path
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,18 @@ def evaluate_model_api_node(
     
     for image_file in image_files:
         image_path = os.path.join(base_folder, image_file)
-        
+
+        # S'assurer que l'image est bien copiée dans data/07_predict pour l'étape d'OCR
+        predict_dir = Path("data/07_predict")
+        predict_dir.mkdir(parents=True, exist_ok=True)
+        target_path = predict_dir / image_file
+        if not target_path.exists():
+            try:
+                shutil.copy(image_path, target_path)
+                logger.info(f"Image copiée dans {target_path}")
+            except Exception as copy_err:
+                logger.error(f"Erreur lors de la copie de l'image: {copy_err}")
+
         try:
             # Lire et encoder l'image en base64
             with open(image_path, "rb") as img_file:
