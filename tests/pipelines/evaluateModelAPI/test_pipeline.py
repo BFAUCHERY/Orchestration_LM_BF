@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, mock_open, MagicMock
 from pathlib import Path
-from src.orchestration_lm_bf.pipelines.evaluateModelAPI.nodes import evaluate_model_api_node
+from orchestration_lm_bf.pipelines.evaluateModelAPI.nodes import evaluate_model_api_node
 from orchestration_lm_bf.pipelines.evaluateModelAPI.pipeline import create_pipeline
 
 
