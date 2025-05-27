@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: yolov8-ocr-deployment
 spec:
-  replicas: 1
+  replicas: 10
   selector:
     matchLabels:
       app: yolov8-ocr
