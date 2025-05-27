@@ -44,3 +44,4 @@ def test_predict_yolo_returns_predictions():
         assert "boxes" in predictions[0]
         assert "scores" in predictions[0]
         assert "classes" in predictions[0]
+        #Ludo est gay
