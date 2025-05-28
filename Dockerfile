@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.10 as runtime-environment
+FROM --platform=linux/amd64 python:3.10
 
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
@@ -51,17 +51,15 @@ ENV IN_DOCKER=true
 
 WORKDIR /home/kedro_docker
 
-FROM runtime-environment
-
 # copy the whole project with correct ownership
 ARG KEDRO_UID=999
 ARG KEDRO_GID=0
 
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
 
-# Créer un fichier kaggle.json factice pour éviter les erreurs
-RUN echo '{"username":"disabled","key":"disabled"}' > /tmp/kaggle.json && \
-    chmod 600 /tmp/kaggle.json
+# Copier le fichier kaggle.json si fourni
+COPY kaggle.json /home/kedro_docker/.config/kaggle/kaggle.json
+RUN chmod 600 /home/kedro_docker/.config/kaggle/kaggle.json
 
 # Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
 USER root
@@ -96,5 +94,8 @@ USER kedro_docker
 ENV KEDRO_PROJECT_PATH=/home/kedro_docker
 
 EXPOSE 5001
+
+# Vérification du contenu du répertoire
+RUN echo "📁 Structure des fichiers dans /home/kedro_docker :" && ls -la /home/kedro_docker
 
 CMD ["python", "app.py"]

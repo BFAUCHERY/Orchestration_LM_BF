@@ -6,7 +6,6 @@ import os
 from typing import List, Dict
 import warnings
 
-
 def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> List[np.ndarray]:
     print("[PREP] Starting crop preparation from predictions")
     print(f"[PREP] Base folder: {base_folder}")
@@ -65,9 +64,63 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
     print(f"[PREP] Total crops prepared: {len(crops)}")
     return crops
 
+def preprocess_for_sign_ocr(crop):
+    """Preprocessing spécialisé pour panneaux de signalisation"""
+    
+    # 1. Convertir en grayscale
+    if len(crop.shape) == 3:
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = crop.copy()
+    
+    # 2. Redimensionner pour améliorer la résolution (important pour Tesseract)
+    height, width = gray.shape
+    if height < 100 or width < 100:  # Si trop petit, agrandir
+        scale_factor = max(150 / height, 150 / width)
+        new_height = int(height * scale_factor)
+        new_width = int(width * scale_factor)
+        gray = cv2.resize(gray, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+        print(f"[OCR] Resized from {width}x{height} to {new_width}x{new_height}")
+    
+    # 3. Débruitage
+    denoised = cv2.medianBlur(gray, 3)
+    
+    # 4. Amélioration du contraste adaptatif
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(denoised)
+    
+    # 5. Détection des contours pour isoler le texte
+    # Utiliser différentes approches selon le type de panneau
+    
+    # Approche 1: Seuillage adaptatif (bon pour panneaux avec fond uniforme)
+    adaptive_thresh = cv2.adaptiveThreshold(
+        enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    
+    # Approche 2: Seuillage d'Otsu (bon pour panneaux contrastés)
+    _, otsu_thresh = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # Approche 3: Seuillage pour texte blanc sur fond coloré
+    _, inv_thresh = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    
+    # 6. Morphologie pour nettoyer
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    
+    adaptive_clean = cv2.morphologyEx(adaptive_thresh, cv2.MORPH_CLOSE, kernel)
+    otsu_clean = cv2.morphologyEx(otsu_thresh, cv2.MORPH_CLOSE, kernel)
+    inv_clean = cv2.morphologyEx(inv_thresh, cv2.MORPH_CLOSE, kernel)
+    
+    return {
+        'original': gray,
+        'adaptive': adaptive_clean,
+        'otsu': otsu_clean,
+        'inverted': inv_clean,
+        'enhanced': enhanced
+    }
+
 def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
-    """OCR avec Tesseract - plus stable que EasyOCR dans Docker"""
-    print(f"[OCR] Starting TESSERACT text extraction from {len(crops)} crops")
+    """OCR avec Tesseract optimisé pour panneaux de signalisation"""
+    print(f"[OCR] Starting OPTIMIZED TESSERACT text extraction from {len(crops)} crops")
     
     if not crops:
         print("[OCR] No crops to process")
@@ -81,95 +134,88 @@ def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
         
         for idx, crop in enumerate(crops):
             try:
-                print(f"[OCR] Processing crop {idx + 1}/{len(crops)} with Tesseract")
+                print(f"[OCR] Processing crop {idx + 1}/{len(crops)} with advanced preprocessing")
                 
-                # Convertir BGR (OpenCV) vers RGB (PIL)
-                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                pil_img = Image.fromarray(rgb_crop)
+                # Préprocessing spécialisé
+                processed_images = preprocess_for_sign_ocr(crop)
                 
-                # Préprocessing pour améliorer l'OCR
-                # 1. Convertir en grayscale
-                gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                
-                # 2. Améliorer le contraste
-                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-                enhanced = clahe.apply(gray_crop)
-                
-                # 3. Appliquer un seuil pour binariser l'image
-                _, thresh_crop = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                
-                # 4. Débruitage
-                kernel = np.ones((2,2), np.uint8)
-                cleaned = cv2.morphologyEx(thresh_crop, cv2.MORPH_CLOSE, kernel)
-                
-                # Convertir en PIL pour Tesseract
-                thresh_pil = Image.fromarray(cleaned)
-                
-                # OCR avec différentes configurations Tesseract
+                # Configurations Tesseract optimisées pour panneaux
                 configs = [
-                    '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Mot seul, lettres et chiffres
-                    '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Ligne de texte
-                    '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Bloc de texte uniforme
-                    '--psm 13',  # Raw line
-                    '--psm 8',   # Mot seul sans restriction
-                    '--psm 10'   # Caractère seul
+                    # Configuration 1: Texte de panneau standard (STOP, YIELD, etc.)
+                    {
+                        'config': '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ ',
+                        'description': 'Mot seul - lettres majuscules seulement'
+                    },
+                    # Configuration 2: Panneaux avec chiffres (vitesse, distances)
+                    {
+                        'config': '--psm 8 -c tessedit_char_whitelist=0123456789KMHMPHABCDEFGHIJKLMNOPQRSTUVWXYZ ',
+                        'description': 'Mot seul - lettres et chiffres'
+                    },
+                    # Configuration 3: Ligne de texte simple
+                    {
+                        'config': '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+                        'description': 'Ligne de texte'
+                    },
+                    # Configuration 4: Mode caractère par caractère pour texte difficile
+                    {
+                        'config': '--psm 10 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                        'description': 'Caractère seul'
+                    },
+                    # Configuration 5: Mode permissif pour capturer tout
+                    {
+                        'config': '--psm 8',
+                        'description': 'Mot seul - tous caractères'
+                    },
+                    # Configuration 6: Bloc de texte pour panneaux complexes
+                    {
+                        'config': '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+                        'description': 'Bloc de texte uniforme'
+                    }
                 ]
                 
-                best_text = ""
-                best_conf = 0.0
+                best_results = []
                 
-                for config_idx, config in enumerate(configs):
-                    try:
-                        # Essayer sur l'image preprocessée
-                        text = pytesseract.image_to_string(thresh_pil, config=config).strip()
-                        
-                        if text and len(text) >= len(best_text):
-                            # Calculer une confiance basée sur la longueur et la configuration
-                            conf = 0.9 - (config_idx * 0.1)  # Première config = meilleure confiance
-                            if len(text) > 1:  # Bonus pour texte plus long
-                                conf += 0.05
-                            
-                            best_text = text
-                            best_conf = max(conf, 0.5)  # Minimum 50%
-                            
-                            print(f"[OCR] Config {config_idx}: '{text}' (conf: {conf:.2f})")
-                            
-                            # Si on trouve quelque chose de satisfaisant, on s'arrête
-                            if len(text) >= 3:
-                                break
-                                
-                    except Exception as e:
-                        print(f"[OCR] Config {config_idx} failed: {e}")
-                        continue
-                
-                # Si rien trouvé avec l'image preprocessée, essayer sur l'originale
-                if not best_text:
-                    try:
-                        print(f"[OCR] Trying original image for crop {idx + 1}")
-                        text = pytesseract.image_to_string(pil_img, config='--psm 8').strip()
-                        if text:
-                            best_text = text
-                            best_conf = 0.7
-                            print(f"[OCR] Original image: '{text}'")
-                    except Exception as e:
-                        print(f"[OCR] Original image OCR failed: {e}")
-                
-                if best_text:
-                    # Nettoyer le texte (supprimer caractères indésirables)
-                    cleaned_text = ''.join(c for c in best_text if c.isalnum() or c.isspace()).strip()
+                # Tester chaque configuration sur chaque image préprocessée
+                for img_name, img in processed_images.items():
+                    pil_img = Image.fromarray(img)
                     
-                    if cleaned_text:
-                        print(f"[OCR] ✅ Tesseract found: '{cleaned_text}' (confidence: {best_conf:.2f})")
-                        results.append([{
-                            "text": cleaned_text,
-                            "confidence": best_conf,
-                            "bbox": [0, 0, crop.shape[1], 0, crop.shape[1], crop.shape[0], 0, crop.shape[0]]
-                        }])
-                    else:
-                        print(f"[OCR] Text found but empty after cleaning: '{best_text}'")
-                        results.append([])
+                    for config_data in configs:
+                        try:
+                            text = pytesseract.image_to_string(
+                                pil_img, 
+                                config=config_data['config']
+                            ).strip()
+                            
+                            if text and len(text) > 0:
+                                # Nettoyer le texte
+                                cleaned_text = ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+                                
+                                if cleaned_text and len(cleaned_text) >= 2:  # Au moins 2 caractères
+                                    # Calculer un score de qualité
+                                    quality_score = calculate_text_quality(cleaned_text, img_name, config_data['description'])
+                                    
+                                    best_results.append({
+                                        'text': cleaned_text,
+                                        'confidence': quality_score,
+                                        'method': f"{img_name}+{config_data['description']}",
+                                        'bbox': [0, 0, crop.shape[1], 0, crop.shape[1], crop.shape[0], 0, crop.shape[0]]
+                                    })
+                                    
+                                    print(f"[OCR] {img_name} + {config_data['description']}: '{cleaned_text}' (score: {quality_score:.2f})")
+                                    
+                        except Exception as e:
+                            continue
+                
+                # Sélectionner le meilleur résultat
+                if best_results:
+                    # Trier par confiance décroissante
+                    best_results.sort(key=lambda x: x['confidence'], reverse=True)
+                    best_result = best_results[0]
+                    
+                    print(f"[OCR] ✅ BEST: '{best_result['text']}' (conf: {best_result['confidence']:.2f}, method: {best_result['method']})")
+                    results.append([best_result])
                 else:
-                    print(f"[OCR] No text found in crop {idx + 1}")
+                    print(f"[OCR] ❌ No text found in crop {idx + 1}")
                     results.append([])
                     
             except Exception as e:
@@ -191,3 +237,57 @@ def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
     print(f"[OCR] ✅ Completed processing {len(results)} crops with {total_detections} text detections")
     
     return results
+
+def calculate_text_quality(text, preprocessing_method, config_description):
+    """Calcule un score de qualité pour le texte détecté"""
+    score = 0.5  # Score de base
+    
+    # Bonus pour longueur appropriée
+    if 1 <= len(text) <= 10:
+        score += 0.2
+    elif len(text) > 10:
+        score -= 0.1
+    
+    # Bonus pour mots de panneaux courants
+    common_sign_words = [
+        'STOP', 'YIELD', 'SPEED', 'LIMIT', 'ZONE', 'SCHOOL', 'PEDESTRIAN',
+        'CROSSING', 'DANGER', 'WARNING', 'CAUTION', 'EXIT', 'ENTER',
+        'ONE', 'WAY', 'DO', 'NOT', 'TURN', 'LEFT', 'RIGHT', 'AHEAD'
+    ]
+    
+    # Bonus pour vitesses courantes (panneaux de limitation)
+    common_speeds = ['20', '30', '40', '50', '60', '70', '80', '90', '100', '110', '130']
+    
+    if text.upper() in common_sign_words:
+        score += 0.3
+        print(f"[OCR] Bonus for common sign word: {text}")
+    elif text in common_speeds:
+        score += 0.4  # Bonus encore plus élevé pour les vitesses
+        print(f"[OCR] Bonus for speed limit: {text}")
+    
+    # Bonus pour chiffres seuls (panneaux de vitesse)
+    if text.isdigit():
+        digit_value = int(text)
+        if 20 <= digit_value <= 130 and digit_value % 10 == 0:  # Vitesses réalistes
+            score += 0.3
+            print(f"[OCR] Bonus for realistic speed: {text}")
+        elif 1 <= digit_value <= 99:  # Autres chiffres valides
+            score += 0.2
+    
+    # Bonus pour texte tout en majuscules (typique des panneaux)
+    if text.isupper() and len(text) > 1:
+        score += 0.1
+    
+    # Bonus selon la méthode de preprocessing
+    if preprocessing_method == 'adaptive':
+        score += 0.05
+    elif preprocessing_method == 'enhanced':
+        score += 0.03
+    elif preprocessing_method == 'inverted':  # Bon pour panneaux de vitesse
+        score += 0.04
+    
+    # Malus pour caractères étranges
+    strange_chars = sum(1 for c in text if not (c.isalnum() or c.isspace()))
+    score -= strange_chars * 0.1
+    
+    return min(1.0, max(0.1, score))  # Entre 0.1 et 1.0

@@ -25,5 +25,7 @@ results
 !references/.gitkeep
 !results/.gitkeep
 
+# Allow kaggle.json
+!.kaggle/kaggle.json
 # NOTE: Le dossier model/ n'est PAS ignoré
 # donc model/yolov8n.pt et model/model.pt seront disponibles dans Docker
