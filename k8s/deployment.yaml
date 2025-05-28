@@ -16,8 +16,9 @@ spec:
     spec:
       containers:
       containers:
-      - name: yolov8-ocr-container
-        image: ludovicmarion/orchestration_lm_bf:latest
+    - name: yolov8-ocr-container
+      image: ludovicmarion/orchestration_lm_bf:latest
+      workingDir: /home/kedro_docker
         imagePullPolicy: Always  # Pour forcer le pull de la dernière image
         ports:
         - containerPort: 5001  # Changé pour correspondre à votre app
