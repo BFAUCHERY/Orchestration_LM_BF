@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=python:3.10-slim
+ARG BASE_IMAGE=python:3.10
 FROM $BASE_IMAGE as runtime-environment
 
 # update pip and install uv
@@ -19,40 +19,46 @@ ARG KEDRO_GID=0
 RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
     useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
 
-# Créer les dossiers nécessaires
-RUN mkdir -p /home/kedro_docker/data/01_raw \
-    /home/kedro_docker/data/02_intermediate \
-    /home/kedro_docker/data/02_model \
-    /home/kedro_docker/data/03_primary \
-    /home/kedro_docker/data/04_eval_API \
-    /home/kedro_docker/data/05_model_output \
-    /home/kedro_docker/data/05_pred_API \
-    /home/kedro_docker/data/06_models \
-    /home/kedro_docker/data/07_predict \
-    /home/kedro_docker/data/08_outputs \
-    /home/kedro_docker/data/01_raw/api_images \
-    /home/kedro_docker/templates \
-    /home/kedro_docker/model
-
 # Variable d'environnement pour indiquer qu'on est dans Docker
 ENV IN_DOCKER=true
 
 WORKDIR /home/kedro_docker
-USER kedro_docker
 
 FROM runtime-environment
 
-# copy the whole project except what is in .dockerignore
+# copy the whole project with correct ownership
 ARG KEDRO_UID=999
 ARG KEDRO_GID=0
-COPY --chown=999:0 . .
+COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
+
+# Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
+USER root
+RUN mkdir -p data/01_raw \
+    data/02_intermediate \
+    data/02_model \
+    data/03_primary \
+    data/04_eval_API \
+    data/05_model_output \
+    data/05_pred_API \
+    data/06_models \
+    data/07_predict \
+    data/08_outputs \
+    data/01_raw/api_images \
+    templates \
+    model && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/data && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/templates && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/model && \
+    chmod -R 755 /home/kedro_docker/data && \
+    chmod -R 755 /home/kedro_docker/templates
 
 # Copier le modèle depuis le dossier model vers data si nécessaire
-# Option 1: Si votre code cherche le modèle dans data/
-RUN cp model/yolov8n.pt data/yolov8n.pt || echo "Model copy failed"
+RUN if [ -f model/yolov8n.pt ]; then cp model/yolov8n.pt data/yolov8n.pt; fi && \
+    if [ -f model/model.pt ]; then cp model/model.pt data/model.pt; fi && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/data
 
-# Option 2: Si vous avez aussi model.pt dans le dossier model/
-RUN cp model/model.pt data/model.pt || echo "Model.pt copy failed"
+# Changer vers l'utilisateur kedro_docker
+USER kedro_docker
 
 EXPOSE 5001
 
