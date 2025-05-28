@@ -19,7 +19,7 @@ def test_train_yolo_mock(mock_yolo_class):
     model_path = train_yolo("fake_data.yaml")
 
     # Vérifie que YOLO a bien été instancié avec le bon fichier
-    mock_yolo_class.assert_called_once_with("data/yolov8n.pt")
+    mock_yolo_class.assert_called_once_with("model/yolov8n.pt")
 
     # Vérifie que train() a été appelé avec les bons arguments
     mock_model.train.assert_called_once_with(
