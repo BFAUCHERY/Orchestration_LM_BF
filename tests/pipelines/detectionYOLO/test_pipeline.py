@@ -33,4 +33,4 @@ def test_train_yolo_mock(mock_yolo_class):
     print("TEST: Training function was mocked successfully.")
 
     # Vérifie que le chemin retourné est correct
-    assert model_path == "data/model.pt"
+    assert model_path == "model/model.pt"
