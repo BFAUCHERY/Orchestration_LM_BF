@@ -6,10 +6,9 @@ import easyocr
 import os
 from typing import List, Dict
 import warnings
-import signal
 import time
-import multiprocessing
-from concurrent.futures import ProcessPoolExecutor, TimeoutError
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 warnings.filterwarnings("ignore", message=".*NNPACK.*")
 
@@ -71,73 +70,54 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
     print(f"[PREP] Total crops prepared: {len(crops)}")
     return crops
 
-def ocr_worker(crop_data):
-    """Fonction worker pour OCR dans un processus séparé"""
-    try:
-        import easyocr
-        import numpy as np
+class TimeoutOCR:
+    """Classe pour gérer OCR avec timeout sans signal"""
+    
+    def __init__(self, timeout_seconds=15):
+        self.timeout_seconds = timeout_seconds
+        self.result = None
+        self.exception = None
         
-        # Désérialiser le crop
-        crop = np.frombuffer(crop_data['data'], dtype=crop_data['dtype']).reshape(crop_data['shape'])
-        idx = crop_data['idx']
-        
-        print(f"[OCR-Worker] Processing crop {idx + 1}")
-        
-        # Initialiser EasyOCR dans le processus worker
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-        
-        # Timeout alarm handler
-        def timeout_handler(signum, frame):
-            raise TimeoutError("OCR timeout")
-        
-        # Set timeout de 30 secondes
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(30)
-        
+    def run_ocr(self, reader, crop):
+        """Fonction qui exécute l'OCR"""
         try:
-            text_results = reader.readtext(crop)
-            signal.alarm(0)  # Cancel timeout
-            
-            crop_texts = []
-            for bbox, text, confidence in text_results:
-                print(f"[OCR-Worker] Detected text: '{text}' with confidence {confidence}")
-                crop_texts.append({
-                    "text": text,
-                    "confidence": float(confidence),
-                    "bbox": [float(coord) for coord in np.array(bbox).flatten()]
-                })
-            return crop_texts
-            
-        except TimeoutError:
-            print(f"[OCR-Worker] ⏰ Timeout pour crop {idx + 1}")
-            return []
+            self.result = reader.readtext(crop)
         except Exception as e:
-            print(f"[OCR-Worker] ❌ Error processing crop {idx + 1}: {e}")
-            return []
-        finally:
-            signal.alarm(0)  # Cancel any remaining alarm
+            self.exception = e
+    
+    def extract_with_timeout(self, reader, crop):
+        """Lance OCR avec timeout"""
+        # Lancer OCR dans un thread séparé
+        thread = threading.Thread(target=self.run_ocr, args=(reader, crop))
+        thread.daemon = True  # Thread daemon pour qu'il se ferme avec le programme
+        thread.start()
+        
+        # Attendre avec timeout
+        thread.join(timeout=self.timeout_seconds)
+        
+        if thread.is_alive():
+            # Thread encore actif = timeout
+            print(f"[OCR] ⏰ Timeout après {self.timeout_seconds}s")
+            return None
+        
+        if self.exception:
+            print(f"[OCR] ❌ Erreur OCR: {self.exception}")
+            return None
             
-    except Exception as e:
-        print(f"[OCR-Worker] ❌ Critical error in worker: {e}")
-        return []
+        return self.result
 
 def extract_text_from_crops_simple(crops: List[np.ndarray]) -> List[Dict]:
-    """Version simplifiée sans multiprocessing pour Docker"""
+    """Version simplifiée et robuste pour Docker/Kedro"""
     print(f"[OCR] Starting simple text extraction from {len(crops)} crops")
     
-    # Fallback simple si problème avec EasyOCR
+    # Initialiser EasyOCR une seule fois
     try:
-        # Test rapide d'EasyOCR
+        print("[OCR] Initializing EasyOCR...")
         reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-        
-        # Test sur une petite image
-        test_img = np.ones((50, 50, 3), dtype=np.uint8) * 255
-        reader.readtext(test_img)
-        print("[OCR] EasyOCR test passed")
-        
+        print("[OCR] EasyOCR initialized successfully")
     except Exception as e:
-        print(f"[OCR] ❌ EasyOCR failed, using fallback: {e}")
-        # Retourner des résultats vides en cas d'échec
+        print(f"[OCR] ❌ Failed to initialize EasyOCR: {e}")
+        # Retourner des résultats vides si EasyOCR ne peut pas s'initialiser
         return [[] for _ in crops]
     
     results = []
@@ -145,91 +125,94 @@ def extract_text_from_crops_simple(crops: List[np.ndarray]) -> List[Dict]:
         try:
             print(f"[OCR] Processing crop {idx + 1}/{len(crops)}")
             
-            # Timeout simple avec alarm
-            def timeout_handler(signum, frame):
-                raise TimeoutError("OCR timeout")
+            # Utiliser la classe TimeoutOCR
+            timeout_ocr = TimeoutOCR(timeout_seconds=15)
+            text_results = timeout_ocr.extract_with_timeout(reader, crop)
             
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(20)  # 20 secondes timeout
+            if text_results is None:
+                # Timeout ou erreur
+                results.append([])
+                continue
             
-            try:
-                text_results = reader.readtext(crop)
-                signal.alarm(0)  # Cancel timeout
-                
-                crop_texts = []
-                for bbox, text, confidence in text_results:
-                    print(f"[OCR] Detected text: '{text}' with confidence {confidence}")
-                    crop_texts.append({
-                        "text": text,
-                        "confidence": float(confidence),
-                        "bbox": [float(coord) for coord in np.array(bbox).flatten()]
-                    })
-                results.append(crop_texts)
-                
-            except TimeoutError:
-                print(f"[OCR] ⏰ Timeout pour crop {idx + 1}")
-                results.append([])
-            except Exception as e:
-                print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
-                results.append([])
-            finally:
-                signal.alarm(0)
-                
+            # Traiter les résultats
+            crop_texts = []
+            for bbox, text, confidence in text_results:
+                print(f"[OCR] Detected text: '{text}' with confidence {confidence:.3f}")
+                crop_texts.append({
+                    "text": text,
+                    "confidence": float(confidence),
+                    "bbox": [float(coord) for coord in np.array(bbox).flatten()]
+                })
+            
+            results.append(crop_texts)
+            
         except Exception as e:
             print(f"[OCR] ❌ Critical error processing crop {idx + 1}: {e}")
+            results.append([])
+    
+    print(f"[OCR] Completed processing {len(results)} crops")
+    return results
+
+def extract_text_from_crops_fallback(crops: List[np.ndarray]) -> List[Dict]:
+    """Version ultra-simple sans timeout pour éviter tout problème"""
+    print(f"[OCR] Starting fallback text extraction from {len(crops)} crops")
+    
+    try:
+        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        print("[OCR] EasyOCR reader created")
+    except Exception as e:
+        print(f"[OCR] ❌ EasyOCR initialization failed: {e}")
+        return [[] for _ in crops]
+    
+    results = []
+    for idx, crop in enumerate(crops):
+        try:
+            print(f"[OCR] Processing crop {idx + 1}/{len(crops)} (fallback mode)")
+            
+            # OCR direct sans timeout - si ça bloque, ça bloque mais au moins ça essaie
+            text_results = reader.readtext(crop)
+            
+            crop_texts = []
+            for bbox, text, confidence in text_results:
+                print(f"[OCR] Found: '{text}' (conf: {confidence:.3f})")
+                crop_texts.append({
+                    "text": text,
+                    "confidence": float(confidence),
+                    "bbox": [float(coord) for coord in np.array(bbox).flatten()]
+                })
+            
+            results.append(crop_texts)
+            
+        except Exception as e:
+            print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
             results.append([])
     
     return results
 
 def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
-    """Version principale avec multiprocessing et fallback"""
+    """Fonction principale avec plusieurs fallbacks"""
     print(f"[OCR] Starting text extraction from {len(crops)} crops")
     
-    # Vérifier si on est dans Docker ou si multiprocessing pose problème
+    # Détecter l'environnement
     is_docker = os.environ.get('IN_DOCKER', False) or os.path.exists('/.dockerenv')
     
     if is_docker:
         print("[OCR] Docker detected, using simple extraction")
-        return extract_text_from_crops_simple(crops)
-    
-    # Essayer avec multiprocessing
-    try:
-        # Préparer les données pour les workers
-        crop_data_list = []
-        for idx, crop in enumerate(crops):
-            crop_data = {
-                'data': crop.tobytes(),
-                'dtype': crop.dtype,
-                'shape': crop.shape,
-                'idx': idx
-            }
-            crop_data_list.append(crop_data)
         
-        # Utiliser ProcessPoolExecutor avec timeout
-        results = []
-        with ProcessPoolExecutor(max_workers=2) as executor:
+        # Essayer d'abord la version avec timeout
+        try:
+            return extract_text_from_crops_simple(crops)
+        except Exception as e:
+            print(f"[OCR] ❌ Simple extraction failed: {e}")
+            print("[OCR] Trying fallback extraction...")
+            
+            # Si ça échoue, essayer la version ultra-simple
             try:
-                # Timeout global de 60 secondes
-                futures = [executor.submit(ocr_worker, crop_data) for crop_data in crop_data_list]
-                
-                for i, future in enumerate(futures):
-                    try:
-                        result = future.result(timeout=30)  # 30s par crop
-                        results.append(result)
-                        print(f"[OCR] Completed crop {i+1}/{len(crops)}")
-                    except TimeoutError:
-                        print(f"[OCR] ⏰ Timeout for crop {i+1}")
-                        results.append([])
-                    except Exception as e:
-                        print(f"[OCR] ❌ Error for crop {i+1}: {e}")
-                        results.append([])
-                        
+                return extract_text_from_crops_fallback(crops)
             except Exception as e:
-                print(f"[OCR] ❌ ProcessPool error: {e}")
-                return extract_text_from_crops_simple(crops)
-                
-        return results
-        
-    except Exception as e:
-        print(f"[OCR] ❌ Multiprocessing failed, using simple fallback: {e}")
+                print(f"[OCR] ❌ Fallback extraction also failed: {e}")
+                # Dernier recours : résultats vides
+                return [[] for _ in crops]
+    else:
+        # En local, utiliser la version simple
         return extract_text_from_crops_simple(crops)
