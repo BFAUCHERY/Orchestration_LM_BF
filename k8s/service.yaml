@@ -9,7 +9,6 @@ spec:
   selector:
     app: yolov8-ocr
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 5001  # Changé pour correspondre au port de l'app
-    nodePort: 30001   # Port fixe pour accès plus facile
+    - protocol: TCP
+      port: 80
+      targetPort: 5001
