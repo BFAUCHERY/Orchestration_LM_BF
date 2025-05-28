@@ -15,34 +15,33 @@ spec:
         app: yolov8-ocr
     spec:
       containers:
-      containers:
-    - name: yolov8-ocr-container
-      image: ludovicmarion/orchestration_lm_bf:latest
-      workingDir: /home/kedro_docker
-        imagePullPolicy: Always  # Pour forcer le pull de la dernière image
-        ports:
-        - containerPort: 5001  # Changé pour correspondre à votre app
-        resources:
-          requests:
-            cpu: "500m"     # Augmenté pour YOLO
-            memory: "2Gi"   # Augmenté pour les modèles
-          limits:
-            cpu: "2000m"    # 2 CPU
-            memory: "4Gi"   # 4GB RAM
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 5001
-          initialDelaySeconds: 30  # Plus de temps pour charger les modèles
-          periodSeconds: 10
-          timeoutSeconds: 5
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 5001
-          initialDelaySeconds: 60  # Encore plus de temps pour le premier démarrage
-          periodSeconds: 30
-          timeoutSeconds: 10
-        env:
-        - name: PYTHONUNBUFFERED
-          value: "1"  # Pour voir les logs Python en temps réel
+        - name: yolov8-ocr-container
+          image: ludovicmarion/orchestration_lm_bf:latest
+          workingDir: /home/kedro_docker
+          imagePullPolicy: Always  # Pour forcer le pull de la dernière image
+          ports:
+            - containerPort: 5001  # Changé pour correspondre à votre app
+          resources:
+            requests:
+              cpu: "500m"     # Augmenté pour YOLO
+              memory: "2Gi"   # Augmenté pour les modèles
+            limits:
+              cpu: "2000m"    # 2 CPU
+              memory: "4Gi"   # 4GB RAM
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 30  # Plus de temps pour charger les modèles
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 60  # Encore plus de temps pour le premier démarrage
+            periodSeconds: 30
+            timeoutSeconds: 10
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"  # Pour voir les logs Python en temps réel
