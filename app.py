@@ -16,6 +16,11 @@ import time
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+@app.before_request
+def log_pod_info():
+    pod_name = os.environ.get("HOSTNAME", "unknown")
+    print(f"📥 Requête traitée par le pod: {pod_name} - {request.method} {request.path}")
+
 # Initialisation du projet Kedro
 bootstrap_project(Path.cwd())
 

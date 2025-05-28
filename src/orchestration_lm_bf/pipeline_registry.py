@@ -29,9 +29,7 @@ def register_pipelines() -> dict[str, Pipeline]:
 
 
     pipelines["local_pipeline"] = (
-        pipelines["LoadDataKaggle"]
-        + pipelines["detectionYOLO"]
-        + pipelines["evaluateYOLO"]
+        pipelines["evaluateYOLO"]
         + pipelines["OCRtesseract"]
     )
 

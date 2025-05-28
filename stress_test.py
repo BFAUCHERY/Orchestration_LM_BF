@@ -12,11 +12,23 @@ import time
 import requests
 from io import BytesIO
 from PIL import Image
+import subprocess
+
+def get_minikube_url(service_name):
+    try:
+        output = subprocess.check_output(
+            ["minikube", "service", service_name, "--url"],
+            stderr=subprocess.STDOUT
+        )
+        return output.decode().strip()
+    except subprocess.CalledProcessError as e:
+        print("Erreur lors de l'obtention de l'URL Minikube:", e.output.decode())
+        return None
 
 # ------------------------------
 # Configuration à adapter
 # ------------------------------
-URL = "http://127.0.0.1:55013/predict"  # Ex. obtenu via `minikube service --url`
+URL = get_minikube_url("yolov8-ocr-service")
 IMAGE_PATH = "test_image.jpg"
 NUM_REQUESTS = 100
 MAX_WORKERS = 10
@@ -40,6 +52,11 @@ def main():
     parser.add_argument('--requests', type=int, default=NUM_REQUESTS, help="Nombre total de requêtes")
     parser.add_argument('--workers', type=int, default=MAX_WORKERS, help="Nombre de threads")
     args = parser.parse_args()
+
+    global URL
+    if not URL:
+        print("Impossible de déterminer l'URL du service.")
+        return
 
     latencies = []
     statuses = []

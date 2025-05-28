@@ -5,7 +5,9 @@ from typing import Dict, Any, List, Union
 import logging
 from pathlib import Path
 import shutil
+from pathlib import Path
 
+Path("data/07_predict").mkdir(parents=True, exist_ok=True)
 logger = logging.getLogger(__name__)
 
 def evaluate_model_api_node(

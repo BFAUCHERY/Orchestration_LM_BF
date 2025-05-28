@@ -19,6 +19,17 @@ ARG KEDRO_GID=0
 RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
     useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
 
+RUN mkdir -p /home/kedro_docker/data/01_raw \
+    /home/kedro_docker/data/02_intermediate \
+    /home/kedro_docker/data/02_model \
+    /home/kedro_docker/data/03_primary \
+    /home/kedro_docker/data/04_eval_API \
+    /home/kedro_docker/data/05_model_output \
+    /home/kedro_docker/data/05_pred_API \
+    /home/kedro_docker/data/06_models \
+    /home/kedro_docker/data/07_predict \
+    /home/kedro_docker/data/08_outputs
+
 WORKDIR /home/kedro_docker
 USER kedro_docker
 
@@ -27,7 +38,7 @@ FROM runtime-environment
 # copy the whole project except what is in .dockerignore
 ARG KEDRO_UID=999
 ARG KEDRO_GID=0
-COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
+COPY --chown=999:0 . .
 
 EXPOSE 5001
 
