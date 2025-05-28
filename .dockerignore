@@ -24,3 +24,6 @@ results
 !notebooks/.gitkeep
 !references/.gitkeep
 !results/.gitkeep
+
+# NOTE: Le dossier model/ n'est PAS ignoré
+# donc model/yolov8n.pt et model/model.pt seront disponibles dans Docker

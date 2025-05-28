@@ -52,7 +52,7 @@ model:
 
 model_yolo:
   type: orchestration_lm_bf.datasets.yolo_model_dataset.YOLOModelDataset
-  filepath: data/yolov8n.pt
+  filepath: model/yolov8n.pt
 
 yolo_predictions:
   type: json.JSONDataset

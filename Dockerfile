@@ -19,22 +19,7 @@ ARG KEDRO_GID=0
 RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
     useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
 
-
 # Créer les dossiers nécessaires
-RUN mkdir -p data/07_predict \
-    data/05_model_output \
-    data/08_outputs \
-    data/01_raw/api_images \
-    templates
-
-# S'assurer que les modèles sont bien copiés
-# Ajustez ces chemins selon votre structure
-COPY data/model.pt data/model.pt
-COPY data/yolov8n.pt data/yolov8n.pt
-
-# Variable d'environnement pour indiquer qu'on est dans Docker
-ENV IN_DOCKER=true
-
 RUN mkdir -p /home/kedro_docker/data/01_raw \
     /home/kedro_docker/data/02_intermediate \
     /home/kedro_docker/data/02_model \
@@ -44,22 +29,16 @@ RUN mkdir -p /home/kedro_docker/data/01_raw \
     /home/kedro_docker/data/05_pred_API \
     /home/kedro_docker/data/06_models \
     /home/kedro_docker/data/07_predict \
-    /home/kedro_docker/data/08_outputs
+    /home/kedro_docker/data/08_outputs \
+    /home/kedro_docker/data/01_raw/api_images \
+    /home/kedro_docker/templates \
+    /home/kedro_docker/model
+
+# Variable d'environnement pour indiquer qu'on est dans Docker
+ENV IN_DOCKER=true
 
 WORKDIR /home/kedro_docker
 USER kedro_docker
-
-# Create data folders as kedro_docker user in the container
-RUN mkdir -p data/01_raw \
-    data/02_intermediate \
-    data/02_model \
-    data/03_primary \
-    data/04_eval_API \
-    data/05_model_output \
-    data/05_pred_API \
-    data/06_models \
-    data/07_predict \
-    data/08_outputs
 
 FROM runtime-environment
 
@@ -67,6 +46,13 @@ FROM runtime-environment
 ARG KEDRO_UID=999
 ARG KEDRO_GID=0
 COPY --chown=999:0 . .
+
+# Copier le modèle depuis le dossier model vers data si nécessaire
+# Option 1: Si votre code cherche le modèle dans data/
+RUN cp model/yolov8n.pt data/yolov8n.pt || echo "Model copy failed"
+
+# Option 2: Si vous avez aussi model.pt dans le dossier model/
+RUN cp model/model.pt data/model.pt || echo "Model.pt copy failed"
 
 EXPOSE 5001
 

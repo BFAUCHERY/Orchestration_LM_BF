@@ -10,8 +10,8 @@ def train_yolo(data_yaml_path: str) -> str:
     Returns:
         Chemin vers le modèle entraîné (model.pt)
     """
-    model = YOLO("data/yolov8n.pt")
+    model = YOLO("model/yolov8n.pt")
     model.train(data=data_yaml_path, epochs=1, imgsz=160, batch=4, device="cpu", patience=0) 
     
     # Retourne un modèle qui ne sera pas utilisé, on garde le modèle déjà utilisé
-    return "data/model.pt"
+    return "model/model.pt"
