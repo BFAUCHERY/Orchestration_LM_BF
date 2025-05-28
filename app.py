@@ -13,6 +13,15 @@ import shutil
 import sys
 import time
 
+
+# Définir le répertoire de base de l'application
+if os.environ.get('KUBERNETES_SERVICE_HOST'):
+    # On est dans Kubernetes
+    BASE_DIR = Path('/app')  # Assurez-vous que c'est le WORKDIR de votre Dockerfile
+else:
+    # On est en local
+    BASE_DIR = Path.cwd()
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
@@ -22,10 +31,10 @@ def log_pod_info():
     print(f"📥 Requête traitée par le pod: {pod_name} - {request.method} {request.path}")
 
 # Initialisation du projet Kedro
-bootstrap_project(Path.cwd())
+bootstrap_project(BASE_DIR)
 
 # Ajouter le chemin src au PYTHONPATH pour importer les nodes
-sys.path.append(str(Path.cwd() / "src"))
+sys.path.append(str(BASE_DIR / "src"))
 
 # Extensions autorisées
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
@@ -55,7 +64,7 @@ def analyze_sign_local():
         run_pipelines(["evaluateYOLO"])
         
         # Lire les résultats YOLO
-        yolo_results_path = 'data/08_outputs/yolo_predictions.json'
+        yolo_results_path = BASE_DIR / 'data' / '08_outputs' / 'yolo_predictions.json'
         with open(yolo_results_path, 'r', encoding='utf-8') as f:
             data = json.load(f) 
 
@@ -79,7 +88,7 @@ def analyze_sign_local():
             print("🔍 Lancement OCRtesseract...")
             run_pipelines(["OCRtesseract"])
             
-            ocr_path = 'data/08_outputs/ocr_output.json'
+            ocr_path = BASE_DIR / 'data' / '08_outputs' / 'ocr_output.json'
             with open(ocr_path, 'r', encoding='utf-8') as f:
                 ocr_data = json.load(f)
                 
@@ -158,7 +167,7 @@ def analyze_sign_api_direct(image_path):
         predictions = result.get("predictions", [])
         
         # Sauvegarder les prédictions pour la pipeline OCR
-        roboflow_output_path = 'data/05_model_output/roboflow_predictions.json'
+        roboflow_output_path = BASE_DIR / 'data' / '05_model_output' / 'roboflow_predictions.json'
         os.makedirs(os.path.dirname(roboflow_output_path), exist_ok=True)
         
         # Formatter les prédictions pour la pipeline OCR - IMPORTANT: utiliser le bon nom de fichier
@@ -243,7 +252,7 @@ def analyze_sign_api(image_path):
     
     try:
         # Nettoyer les anciens fichiers de prédictions
-        old_predictions_path = 'data/05_model_output/roboflow_predictions.json'
+        old_predictions_path = BASE_DIR / 'data' / '05_model_output' / 'roboflow_predictions.json'
         if os.path.exists(old_predictions_path):
             os.remove(old_predictions_path)
             print(f"🗑️ Ancien fichier de prédictions supprimé")
@@ -270,7 +279,7 @@ def analyze_sign_api(image_path):
             run_pipelines(["ocrAPI"])
             
             # Lire les résultats OCR
-            ocr_path = 'data/08_outputs/ocr_output.json'
+            ocr_path = BASE_DIR / 'data' / '08_outputs' / 'ocr_output.json'
             if os.path.exists(ocr_path):
                 with open(ocr_path, 'r', encoding='utf-8') as f:
                     ocr_data = json.load(f)
@@ -342,7 +351,7 @@ def analyze_sign_api(image_path):
 def run_pipelines(pipelines):
     for pipeline_name in pipelines:
         print(f"Running pipeline: {pipeline_name}")
-        with KedroSession.create(project_path=Path.cwd()) as session:
+        with KedroSession.create(project_path=BASE_DIR) as session:
             session.run(pipeline_name=pipeline_name)
 
 @app.route('/')
@@ -383,10 +392,9 @@ def predict():
         
         # Sauvegarder le fichier temporairement
         filename = "image_to_predict.png"
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        data_folder = os.path.join(project_root, 'data/07_predict/')
+        data_folder = BASE_DIR / 'data' / '07_predict'
         os.makedirs(data_folder, exist_ok=True)
-        filepath = os.path.join(data_folder, filename)
+        filepath = str(data_folder / filename)
         
         # Supprimer le fichier existant s'il existe
         if os.path.exists(filepath):
@@ -504,9 +512,9 @@ if __name__ == '__main__':
         print("✅ Clé API Roboflow configurée")
     
     # Créer les dossiers nécessaires
-    os.makedirs('data/07_predict', exist_ok=True)
-    os.makedirs('data/05_model_output', exist_ok=True)
-    os.makedirs('data/08_outputs', exist_ok=True)
+    os.makedirs(BASE_DIR / 'data' / '07_predict', exist_ok=True)
+    os.makedirs(BASE_DIR / 'data' / '05_model_output', exist_ok=True)
+    os.makedirs(BASE_DIR / 'data' / '08_outputs', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
     
 app.run(debug=True, host='0.0.0.0', port=5001)

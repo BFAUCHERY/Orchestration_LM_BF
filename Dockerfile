@@ -19,6 +19,22 @@ ARG KEDRO_GID=0
 RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
     useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
 
+
+# Créer les dossiers nécessaires
+RUN mkdir -p data/07_predict \
+    data/05_model_output \
+    data/08_outputs \
+    data/01_raw/api_images \
+    templates
+
+# S'assurer que les modèles sont bien copiés
+# Ajustez ces chemins selon votre structure
+COPY data/model.pt data/model.pt
+COPY data/yolov8n.pt data/yolov8n.pt
+
+# Variable d'environnement pour indiquer qu'on est dans Docker
+ENV IN_DOCKER=true
+
 RUN mkdir -p /home/kedro_docker/data/01_raw \
     /home/kedro_docker/data/02_intermediate \
     /home/kedro_docker/data/02_model \
