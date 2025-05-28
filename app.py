@@ -368,6 +368,46 @@ def health_check():
         'modes': ['local', 'api']
     }), 200
 
+@app.route('/test-ocr')
+def test_ocr():
+    """Route de test pour diagnostiquer les problèmes OCR"""
+    import numpy as np
+    import cv2
+    
+    try:
+        print("🧪 Test OCR - Étape 1: Import EasyOCR")
+        import easyocr
+        
+        print("🧪 Test OCR - Étape 2: Initialisation reader")
+        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        
+        print("🧪 Test OCR - Étape 3: Création image test")
+        # Créer une image simple avec du texte
+        test_img = np.ones((100, 300, 3), dtype=np.uint8) * 255
+        cv2.putText(test_img, "STOP", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 3)
+        
+        print("🧪 Test OCR - Étape 4: Exécution OCR")
+        result = reader.readtext(test_img)
+        
+        print(f"🧪 Test OCR - Résultat: {result}")
+        
+        return jsonify({
+            "success": True, 
+            "message": "OCR fonctionne !", 
+            "result": str(result)
+        })
+        
+    except Exception as e:
+        print(f"🧪 Test OCR - Erreur: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            "success": False, 
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
+
 @app.route('/predict', methods=['POST'])
 def predict():
     print("\n🔍 Nouvelle requête reçue sur /predict")
