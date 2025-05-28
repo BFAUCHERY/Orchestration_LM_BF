@@ -2,15 +2,22 @@
 from PIL import Image
 import cv2
 import numpy as np
-import easyocr
 import os
 from typing import List, Dict
 import warnings
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
+# Désactiver les avertissements
 warnings.filterwarnings("ignore", message=".*NNPACK.*")
+warnings.filterwarnings("ignore")
+
+# Désactiver Kaggle avant d'importer EasyOCR
+os.environ['KAGGLE_CONFIG_DIR'] = '/tmp/kaggle_disabled'
+os.environ['KAGGLE_USERNAME'] = ''
+os.environ['KAGGLE_KEY'] = ''
+
+import easyocr
 
 def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> List[np.ndarray]:
     print("[PREP] Starting crop preparation from predictions")
@@ -73,30 +80,35 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
 class TimeoutOCR:
     """Classe pour gérer OCR avec timeout sans signal"""
     
-    def __init__(self, timeout_seconds=15):
+    def __init__(self, timeout_seconds=20):
         self.timeout_seconds = timeout_seconds
         self.result = None
         self.exception = None
+        self.completed = False
         
     def run_ocr(self, reader, crop):
         """Fonction qui exécute l'OCR"""
         try:
+            print(f"[OCR-Thread] Starting OCR processing...")
             self.result = reader.readtext(crop)
+            self.completed = True
+            print(f"[OCR-Thread] OCR completed successfully")
         except Exception as e:
+            print(f"[OCR-Thread] OCR failed with error: {e}")
             self.exception = e
+            self.completed = True
     
     def extract_with_timeout(self, reader, crop):
         """Lance OCR avec timeout"""
         # Lancer OCR dans un thread séparé
         thread = threading.Thread(target=self.run_ocr, args=(reader, crop))
-        thread.daemon = True  # Thread daemon pour qu'il se ferme avec le programme
+        thread.daemon = True
         thread.start()
         
         # Attendre avec timeout
         thread.join(timeout=self.timeout_seconds)
         
-        if thread.is_alive():
-            # Thread encore actif = timeout
+        if not self.completed:
             print(f"[OCR] ⏰ Timeout après {self.timeout_seconds}s")
             return None
         
@@ -106,18 +118,44 @@ class TimeoutOCR:
             
         return self.result
 
-def extract_text_from_crops_simple(crops: List[np.ndarray]) -> List[Dict]:
-    """Version simplifiée et robuste pour Docker/Kedro"""
-    print(f"[OCR] Starting simple text extraction from {len(crops)} crops")
+def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
+    """Fonction principale avec gestion robuste des erreurs"""
+    print(f"[OCR] Starting text extraction from {len(crops)} crops")
     
-    # Initialiser EasyOCR une seule fois
+    # Désactiver explicitement Kaggle
+    os.environ['KAGGLE_CONFIG_DIR'] = '/tmp/kaggle_disabled'
+    os.environ['KAGGLE_USERNAME'] = ''
+    os.environ['KAGGLE_KEY'] = ''
+    
+    # Initialiser EasyOCR avec gestion d'erreurs
+    reader = None
     try:
         print("[OCR] Initializing EasyOCR...")
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        # Forcer l'utilisation d'un répertoire spécifique pour EasyOCR
+        reader = easyocr.Reader(
+            ['en'], 
+            gpu=False, 
+            verbose=False,
+            download_enabled=True
+        )
         print("[OCR] EasyOCR initialized successfully")
     except Exception as e:
         print(f"[OCR] ❌ Failed to initialize EasyOCR: {e}")
-        # Retourner des résultats vides si EasyOCR ne peut pas s'initialiser
+        print(f"[OCR] Error type: {type(e).__name__}")
+        print(f"[OCR] Error details: {str(e)}")
+        
+        # Essayer avec des paramètres différents
+        try:
+            print("[OCR] Trying alternative EasyOCR initialization...")
+            reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+            print("[OCR] Alternative EasyOCR initialization successful")
+        except Exception as e2:
+            print(f"[OCR] ❌ Alternative initialization also failed: {e2}")
+            # Retourner des résultats vides si EasyOCR ne peut pas s'initialiser
+            return [[] for _ in crops]
+    
+    if reader is None:
+        print("[OCR] ❌ Could not initialize EasyOCR reader")
         return [[] for _ in crops]
     
     results = []
@@ -125,19 +163,30 @@ def extract_text_from_crops_simple(crops: List[np.ndarray]) -> List[Dict]:
         try:
             print(f"[OCR] Processing crop {idx + 1}/{len(crops)}")
             
+            # Sauvegarder le crop pour debug
+            debug_path = f"data/07_predict/debug_crop_{idx}.png"
+            cv2.imwrite(debug_path, crop)
+            print(f"[OCR] Debug crop saved to: {debug_path}")
+            
             # Utiliser la classe TimeoutOCR
-            timeout_ocr = TimeoutOCR(timeout_seconds=15)
+            timeout_ocr = TimeoutOCR(timeout_seconds=20)
             text_results = timeout_ocr.extract_with_timeout(reader, crop)
             
+            # Nettoyer le fichier debug
+            try:
+                os.remove(debug_path)
+            except:
+                pass
+            
             if text_results is None:
-                # Timeout ou erreur
+                print(f"[OCR] No results for crop {idx + 1}")
                 results.append([])
                 continue
             
             # Traiter les résultats
             crop_texts = []
             for bbox, text, confidence in text_results:
-                print(f"[OCR] Detected text: '{text}' with confidence {confidence:.3f}")
+                print(f"[OCR] ✅ Detected text: '{text}' with confidence {confidence:.3f}")
                 crop_texts.append({
                     "text": text,
                     "confidence": float(confidence),
@@ -145,74 +194,16 @@ def extract_text_from_crops_simple(crops: List[np.ndarray]) -> List[Dict]:
                 })
             
             results.append(crop_texts)
+            print(f"[OCR] Crop {idx + 1} processed successfully with {len(crop_texts)} text detections")
             
         except Exception as e:
             print(f"[OCR] ❌ Critical error processing crop {idx + 1}: {e}")
+            print(f"[OCR] Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
             results.append([])
     
-    print(f"[OCR] Completed processing {len(results)} crops")
-    return results
-
-def extract_text_from_crops_fallback(crops: List[np.ndarray]) -> List[Dict]:
-    """Version ultra-simple sans timeout pour éviter tout problème"""
-    print(f"[OCR] Starting fallback text extraction from {len(crops)} crops")
-    
-    try:
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-        print("[OCR] EasyOCR reader created")
-    except Exception as e:
-        print(f"[OCR] ❌ EasyOCR initialization failed: {e}")
-        return [[] for _ in crops]
-    
-    results = []
-    for idx, crop in enumerate(crops):
-        try:
-            print(f"[OCR] Processing crop {idx + 1}/{len(crops)} (fallback mode)")
-            
-            # OCR direct sans timeout - si ça bloque, ça bloque mais au moins ça essaie
-            text_results = reader.readtext(crop)
-            
-            crop_texts = []
-            for bbox, text, confidence in text_results:
-                print(f"[OCR] Found: '{text}' (conf: {confidence:.3f})")
-                crop_texts.append({
-                    "text": text,
-                    "confidence": float(confidence),
-                    "bbox": [float(coord) for coord in np.array(bbox).flatten()]
-                })
-            
-            results.append(crop_texts)
-            
-        except Exception as e:
-            print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
-            results.append([])
+    print(f"[OCR] ✅ Completed processing {len(results)} crops")
+    print(f"[OCR] Total text detections: {sum(len(r) for r in results)}")
     
     return results
-
-def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
-    """Fonction principale avec plusieurs fallbacks"""
-    print(f"[OCR] Starting text extraction from {len(crops)} crops")
-    
-    # Détecter l'environnement
-    is_docker = os.environ.get('IN_DOCKER', False) or os.path.exists('/.dockerenv')
-    
-    if is_docker:
-        print("[OCR] Docker detected, using simple extraction")
-        
-        # Essayer d'abord la version avec timeout
-        try:
-            return extract_text_from_crops_simple(crops)
-        except Exception as e:
-            print(f"[OCR] ❌ Simple extraction failed: {e}")
-            print("[OCR] Trying fallback extraction...")
-            
-            # Si ça échoue, essayer la version ultra-simple
-            try:
-                return extract_text_from_crops_fallback(crops)
-            except Exception as e:
-                print(f"[OCR] ❌ Fallback extraction also failed: {e}")
-                # Dernier recours : résultats vides
-                return [[] for _ in crops]
-    else:
-        # En local, utiliser la version simple
-        return extract_text_from_crops_simple(crops)
