@@ -33,6 +33,18 @@ RUN mkdir -p /home/kedro_docker/data/01_raw \
 WORKDIR /home/kedro_docker
 USER kedro_docker
 
+# Create data folders as kedro_docker user in the container
+RUN mkdir -p data/01_raw \
+    data/02_intermediate \
+    data/02_model \
+    data/03_primary \
+    data/04_eval_API \
+    data/05_model_output \
+    data/05_pred_API \
+    data/06_models \
+    data/07_predict \
+    data/08_outputs
+
 FROM runtime-environment
 
 # copy the whole project except what is in .dockerignore
