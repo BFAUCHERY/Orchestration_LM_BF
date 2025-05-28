@@ -17,7 +17,7 @@ import time
 # Définir le répertoire de base de l'application
 if os.environ.get('KUBERNETES_SERVICE_HOST'):
     # On est dans Kubernetes
-    BASE_DIR = Path('/app')  # Assurez-vous que c'est le WORKDIR de votre Dockerfile
+    BASE_DIR = Path(os.getenv("KEDRO_PROJECT_PATH", "/app"))
 else:
     # On est en local
     BASE_DIR = Path.cwd()

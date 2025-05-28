@@ -2,15 +2,36 @@ FROM --platform=linux/amd64 python:3.10 as runtime-environment
 
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
-RUN apt-get update && apt-get install -y libgl1
+
+# Installer les dépendances système nécessaires pour OpenCV et OCR
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    tesseract-ocr \
+    libgdal-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install uv
 
 # install project requirements
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
 
-RUN apt-get update && apt-get install -y tesseract-ocr
+# Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV NUMEXPR_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV VECLIB_MAXIMUM_THREADS=1
+
+# Variables pour désactiver les avertissements
+ENV PYTHONWARNINGS="ignore"
+ENV TF_CPP_MIN_LOG_LEVEL=2
 
 # add kedro user
 ARG KEDRO_UID=999
@@ -30,6 +51,7 @@ ARG KEDRO_UID=999
 ARG KEDRO_GID=0
 
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
+
 # S'assurer que le dossier .kaggle existe avant de copier le fichier kaggle.json
 RUN mkdir -p /home/kedro_docker/.kaggle
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} kaggle.json /home/kedro_docker/.kaggle/kaggle.json
@@ -64,11 +86,16 @@ RUN if [ -f model/yolov8n.pt ]; then cp model/yolov8n.pt data/yolov8n.pt; fi && 
 # Changer vers l'utilisateur kedro_docker
 USER kedro_docker
 
-EXPOSE 5001
-
-RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
+# Pré-télécharger les modèles EasyOCR pour éviter les téléchargements à l'exécution
+RUN python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, verbose=False); print('EasyOCR models downloaded')" || echo "EasyOCR download failed, will download at runtime"
 
 # Définir la variable d'environnement KEDRO_PROJECT_PATH
 ENV KEDRO_PROJECT_PATH=/home/kedro_docker
+
+EXPOSE 5001
+
+# Healthcheck pour vérifier que l'app fonctionne
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5001/health || exit 1
 
 CMD ["python", "app.py"]
