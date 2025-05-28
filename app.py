@@ -345,13 +345,14 @@ def index():
     return render_template('index.html')
 
 @app.route('/api/health')
+@app.route('/health')
 def health_check():
     return jsonify({
         'status': 'healthy',
         'service': 'Traffic Sign Analyzer API',
         'version': '2.0.0',
         'modes': ['local', 'api']
-    })
+    }), 200
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -503,4 +504,4 @@ if __name__ == '__main__':
     os.makedirs('data/08_outputs', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
     
-    app.run(debug=True, host='127.0.0.1', port=5001)
+app.run(debug=True, host='0.0.0.0', port=5001)
