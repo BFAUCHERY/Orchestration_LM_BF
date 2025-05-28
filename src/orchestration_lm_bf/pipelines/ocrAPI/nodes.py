@@ -6,8 +6,6 @@ import os
 from typing import List, Dict
 import warnings
 
-# Supprimer tous les warnings
-warnings.filterwarnings("ignore")
 
 def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> List[np.ndarray]:
     print("[PREP] Starting crop preparation from predictions")
