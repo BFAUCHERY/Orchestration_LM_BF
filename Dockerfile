@@ -69,4 +69,7 @@ EXPOSE 5001
 
 RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
 
+# Définir la variable d'environnement KEDRO_PROJECT_PATH
+ENV KEDRO_PROJECT_PATH=/home/kedro_docker
+
 CMD ["python", "app.py"]
