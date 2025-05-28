@@ -34,9 +34,10 @@ jobs:
           pip install pytest pytest-cov
 
       - name: Configure Kaggle API credentials
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: |
           mkdir -p ~/.kaggle
-          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.kaggle/kaggle.json
+          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" | tee ~/.kaggle/kaggle.json > ./kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
 
       - name: Run tests with coverage

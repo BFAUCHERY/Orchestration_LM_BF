@@ -29,7 +29,12 @@ FROM runtime-environment
 # copy the whole project with correct ownership
 ARG KEDRO_UID=999
 ARG KEDRO_GID=0
+
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
+# S'assurer que le dossier .kaggle existe avant de copier le fichier kaggle.json
+RUN mkdir -p /home/kedro_docker/.kaggle
+COPY --chown=${KEDRO_UID}:${KEDRO_GID} kaggle.json /home/kedro_docker/.kaggle/kaggle.json
+RUN chmod 600 /home/kedro_docker/.kaggle/kaggle.json
 
 # Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
 USER root
