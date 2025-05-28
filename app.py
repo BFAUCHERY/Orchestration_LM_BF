@@ -517,4 +517,5 @@ if __name__ == '__main__':
     os.makedirs(BASE_DIR / 'data' / '08_outputs', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
     
-app.run(debug=True, host='0.0.0.0', port=5001)
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5001)
