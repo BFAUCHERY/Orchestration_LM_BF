@@ -1,5 +1,3 @@
-
-
 #!/usr/bin/env python3
 """
 stress_test.py
@@ -34,7 +32,7 @@ NUM_REQUESTS = 100
 MAX_WORKERS = 10
 # ------------------------------
 
-def send_request(_):
+def send_request(url):
     """Charge l'image et poste vers l'API."""
     with Image.open(IMAGE_PATH) as img:
         buf = BytesIO()
@@ -42,7 +40,7 @@ def send_request(_):
         buf.seek(0)
         files = {'file': ('test_image.jpg', buf, 'image/jpeg')}
         start = time.time()
-        resp = requests.post(URL, files=files)
+        resp = requests.post(url, files=files)
         latency = time.time() - start
         return resp.status_code, latency
 
@@ -53,8 +51,7 @@ def main():
     parser.add_argument('--workers', type=int, default=MAX_WORKERS, help="Nombre de threads")
     args = parser.parse_args()
 
-    global URL
-    if not URL:
+    if not args.url:
         print("Impossible de déterminer l'URL du service.")
         return
 
@@ -64,7 +61,7 @@ def main():
     print(f"Lancement de {args.requests} requêtes vers {args.url} avec {args.workers} workers…")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as exe:
-        futures = [exe.submit(send_request, i) for i in range(args.requests)]
+        futures = [exe.submit(send_request, args.url) for _ in range(args.requests)]
         for f in concurrent.futures.as_completed(futures):
             status, lat = f.result()
             statuses.append(status)
