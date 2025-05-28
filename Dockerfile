@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     tesseract-ocr \
+    tesseract-ocr-eng \
     libgdal-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -34,8 +35,10 @@ ENV VECLIB_MAXIMUM_THREADS=1
 ENV PYTHONWARNINGS="ignore"
 ENV TF_CPP_MIN_LOG_LEVEL=2
 
-# Variables pour éviter les conflits avec Kaggle
-ENV KAGGLE_CONFIG_DIR=/tmp/kaggle_disabled
+# DÉSACTIVER KAGGLE COMPLÈTEMENT
+ENV KAGGLE_CONFIG_DIR=/tmp
+ENV KAGGLE_USERNAME=disabled
+ENV KAGGLE_KEY=disabled
 
 # add kedro user
 ARG KEDRO_UID=999
@@ -55,6 +58,10 @@ ARG KEDRO_UID=999
 ARG KEDRO_GID=0
 
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
+
+# Créer un fichier kaggle.json factice pour éviter les erreurs
+RUN echo '{"username":"disabled","key":"disabled"}' > /tmp/kaggle.json && \
+    chmod 600 /tmp/kaggle.json
 
 # Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
 USER root
@@ -84,11 +91,6 @@ RUN if [ -f model/yolov8n.pt ]; then cp model/yolov8n.pt data/yolov8n.pt; fi && 
 
 # Changer vers l'utilisateur kedro_docker
 USER kedro_docker
-
-# Pré-télécharger les modèles EasyOCR pour éviter les téléchargements à l'exécution
-# Utiliser un répertoire temporaire pour éviter les conflits
-ENV EASYOCR_MODULE_PATH=/home/kedro_docker/.EasyOCR
-RUN python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, verbose=False, download_enabled=True); print('EasyOCR models downloaded')" || echo "EasyOCR download failed, will download at runtime"
 
 # Définir la variable d'environnement KEDRO_PROJECT_PATH
 ENV KEDRO_PROJECT_PATH=/home/kedro_docker
