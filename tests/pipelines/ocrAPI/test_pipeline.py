@@ -56,12 +56,38 @@ def test_extract_text_from_crops_with_mocked_tesseract(mock_image_to_string):
     results = extract_text_from_crops([dummy_crop])
     assert isinstance(results, list)
     assert len(results) == 1
-    assert "Mocked Text" in results[0]
+    assert results[0][0]["text"] == "Mocked Text"
+
+def test_extract_text_from_crops_empty_input():
+    results = extract_text_from_crops([])
+    assert results == []
+
+def test_extract_text_from_crops_invalid_crop():
+    invalid_crop = "not an image"
+    with patch("pytesseract.image_to_string") as mock_tesseract:
+        mock_tesseract.side_effect = Exception("Invalid crop")
+        results = extract_text_from_crops([invalid_crop])
+        assert results[0] == []
+
+def test_extract_text_from_crops_importerror():
+    dummy_crop = np.ones((100, 100, 3), dtype=np.uint8) * 255
+    import builtins
+    import sys
+    original_pytesseract = sys.modules.get("pytesseract", None)
+    sys.modules["pytesseract"] = None
+    try:
+        results = extract_text_from_crops([dummy_crop])
+        assert results == [[]]
+    finally:
+        if original_pytesseract is not None:
+            sys.modules["pytesseract"] = original_pytesseract
+        else:
+            del sys.modules["pytesseract"]
 
 def test_preprocess_for_sign_ocr_outputs():
     dummy_image = np.ones((100, 100, 3), dtype=np.uint8) * 255
     processed = preprocess_for_sign_ocr(dummy_image)
-    expected_keys = {"image", "width", "height", "ratio", "new_width", "new_height"}
+    expected_keys = {"original", "adaptive", "otsu", "inverted", "enhanced"}
     assert isinstance(processed, dict)
     assert expected_keys.issubset(processed.keys())
 
