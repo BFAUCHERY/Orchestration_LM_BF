@@ -67,23 +67,75 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
     return crops
 
 def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
+    import threading
+    import time
+    
     print(f"[OCR] Starting text extraction from {len(crops)} crops")
-    reader = easyocr.Reader(['en'], gpu=False)
+    
+    try:
+        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        print("[OCR] EasyOCR reader created")
+    except Exception as e:
+        print(f"[OCR] Failed to create reader: {e}")
+        return [[] for _ in crops]
+    
     results = []
+    
     for idx, crop in enumerate(crops):
-        try:
-            print(f"[OCR] Processing crop {idx + 1}/{len(crops)}")
-            text_results = reader.readtext(crop)
-            crop_texts = []
-            for bbox, text, confidence in text_results:
-                print(f"[OCR] Detected text: '{text}' with confidence {confidence}")
-                crop_texts.append({
-                    "text": text,
-                    "confidence": float(confidence),
-                    "bbox": [float(coord) for coord in np.array(bbox).flatten()]
-                })
-            results.append(crop_texts)
-        except Exception as e:
-            print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
+        print(f"[OCR] Processing crop {idx + 1}/{len(crops)}")
+        
+        # Variables partagées pour le thread
+        ocr_result = [None]
+        ocr_error = [None]
+        completed = [False]
+        
+        def run_ocr():
+            try:
+                print(f"[OCR] Thread started for crop {idx + 1}")
+                ocr_result[0] = reader.readtext(crop)
+                completed[0] = True
+                print(f"[OCR] Thread completed for crop {idx + 1}")
+            except Exception as e:
+                print(f"[OCR] Thread error for crop {idx + 1}: {e}")
+                ocr_error[0] = e
+                completed[0] = True
+        
+        # Lancer OCR dans un thread avec timeout
+        thread = threading.Thread(target=run_ocr)
+        thread.daemon = True
+        thread.start()
+        
+        # Attendre maximum 30 secondes
+        timeout = 30
+        start_time = time.time()
+        
+        while not completed[0] and (time.time() - start_time) < timeout:
+            time.sleep(0.5)
+            print(f"[OCR] Waiting... {time.time() - start_time:.1f}s")
+        
+        if not completed[0]:
+            print(f"[OCR] ⏰ TIMEOUT après {timeout}s pour crop {idx + 1}")
             results.append([])
+            continue
+        
+        if ocr_error[0]:
+            print(f"[OCR] ❌ Error processing crop {idx + 1}: {ocr_error[0]}")
+            results.append([])
+            continue
+        
+        # Traiter les résultats
+        text_results = ocr_result[0] or []
+        crop_texts = []
+        
+        for bbox, text, confidence in text_results:
+            print(f"[OCR] ✅ Detected text: '{text}' with confidence {confidence}")
+            crop_texts.append({
+                "text": text,
+                "confidence": float(confidence),
+                "bbox": [float(coord) for coord in np.array(bbox).flatten()]
+            })
+        
+        results.append(crop_texts)
+    
+    print(f"[OCR] Completed processing {len(results)} crops")
     return results

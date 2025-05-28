@@ -244,10 +244,14 @@ def analyze_sign_api_direct(image_path):
             'predictions': []
         }
 
+# Variable globale pour indiquer si OCR est en cours
+OCR_IN_PROGRESS = False
+
 def analyze_sign_api(image_path):
     """
     Analyse avec l'API Roboflow + OCR via les pipelines Kedro
     """
+    global OCR_IN_PROGRESS
     start_time = time.perf_counter()
     
     try:
@@ -275,6 +279,10 @@ def analyze_sign_api(image_path):
                 print(f"❌ Fichier de prédictions non trouvé: {old_predictions_path}")
                 raise FileNotFoundError("Fichier de prédictions non trouvé")
             
+            # Marquer OCR en cours
+            OCR_IN_PROGRESS = True
+            print("🔒 OCR_IN_PROGRESS = True")
+            
             # Lancer la pipeline OCR qui utilise les prédictions Roboflow
             run_pipelines(["ocrAPI"])
             
@@ -301,11 +309,22 @@ def analyze_sign_api(image_path):
                     detected_text = all_texts[best_idx]
                     confidence_ocr = all_confidences[best_idx]
                     print(f"✅ Texte détecté: '{detected_text}' (confiance: {confidence_ocr:.2f})")
+                else:
+                    print("⚠️ Aucun texte trouvé dans les résultats OCR")
+            else:
+                print(f"⚠️ Fichier OCR non trouvé: {ocr_path}")
             
         except Exception as e:
             print(f"⚠️ Erreur OCR: {e}")
             print(f"⚠️ L'OCR a échoué, mais l'analyse continue sans le texte")
+            import traceback
+            traceback.print_exc()
             # Continuer sans OCR si erreur
+        
+        finally:
+            # Toujours remettre OCR_IN_PROGRESS à False
+            OCR_IN_PROGRESS = False
+            print("🔓 OCR_IN_PROGRESS = False")
         
         # Calculer le temps de traitement
         processing_time_ms = int((time.perf_counter() - start_time) * 1000)
@@ -321,7 +340,8 @@ def analyze_sign_api(image_path):
             category = best_pred.get('class', 'unknown')
             confidence_yolo = best_pred.get('confidence', 0)
         
-        return {
+        # Debug de la réponse finale
+        response = {
             'success': True,
             'mode': 'api',
             'predictions': predictions,
@@ -339,8 +359,21 @@ def analyze_sign_api(image_path):
             }
         }
         
+        print(f"🔍 DEBUG - Réponse finale créée")
+        print(f"🔍 DEBUG - detected_text: '{detected_text}'")
+        print(f"🔍 DEBUG - confidence_ocr: {confidence_ocr}")
+        print(f"🔍 DEBUG - category: '{category}'")
+        print(f"🔍 DEBUG - success: {response['success']}")
+        
+        return response
+        
     except Exception as e:
+        # S'assurer que OCR_IN_PROGRESS est remis à False en cas d'erreur
+        OCR_IN_PROGRESS = False
         print(f"❌ Erreur lors de l'analyse API: {e}")
+        import traceback
+        traceback.print_exc()
+        
         return {
             'success': False,
             'mode': 'api',
@@ -360,7 +393,12 @@ def index():
 
 @app.route('/api/health')
 @app.route('/health')
+@app.route('/health')
 def health_check():
+    global OCR_IN_PROGRESS
+    if OCR_IN_PROGRESS:
+        return jsonify({'status': 'busy', 'message': 'OCR en cours'}), 503
+    
     return jsonify({
         'status': 'healthy',
         'service': 'Traffic Sign Analyzer API',

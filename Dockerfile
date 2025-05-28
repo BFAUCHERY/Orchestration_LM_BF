@@ -97,8 +97,4 @@ ENV KEDRO_PROJECT_PATH=/home/kedro_docker
 
 EXPOSE 5001
 
-# Healthcheck pour vérifier que l'app fonctionne
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:5001/health || exit 1
-
 CMD ["python", "app.py"]
