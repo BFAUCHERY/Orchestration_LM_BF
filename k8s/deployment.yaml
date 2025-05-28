@@ -15,8 +15,9 @@ spec:
         app: yolov8-ocr
     spec:
       containers:
+      containers:
       - name: yolov8-ocr-container
-        image: youruser/yolov8-ocr-app:latest
+        image: ludovicmarion/orchestration_lm_bf:latest
         imagePullPolicy: Always  # Pour forcer le pull de la dernière image
         ports:
         - containerPort: 5001  # Changé pour correspondre à votre app

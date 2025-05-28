@@ -67,4 +67,6 @@ USER kedro_docker
 
 EXPOSE 5001
 
+RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
+
 CMD ["python", "app.py"]

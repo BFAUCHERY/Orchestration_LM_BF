@@ -5,6 +5,8 @@ import numpy as np
 import easyocr
 import os
 from typing import List, Dict
+import warnings
+warnings.filterwarnings("ignore", message=".*NNPACK.*")
 
 def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> List[np.ndarray]:
     crops = []
@@ -58,7 +60,7 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
 
 def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
     print(f"Extracting text from {len(crops)} crops")
-    reader = easyocr.Reader(['en'])
+    reader = easyocr.Reader(['en'], gpu=False)
     results = []
     for crop in crops:
         text_results = reader.readtext(crop)
