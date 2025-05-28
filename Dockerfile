@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=python:3.10
-FROM $BASE_IMAGE as runtime-environment
+FROM --platform=linux/amd64 python:3.10 as runtime-environment
 
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
