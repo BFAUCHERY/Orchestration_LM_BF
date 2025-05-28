@@ -2,11 +2,12 @@
 from PIL import Image
 import cv2
 import numpy as np
-import easyocr
 import os
 from typing import List, Dict
 import warnings
-warnings.filterwarnings("ignore", message=".*NNPACK.*")
+
+# Supprimer tous les warnings
+warnings.filterwarnings("ignore")
 
 def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> List[np.ndarray]:
     print("[PREP] Starting crop preparation from predictions")
@@ -67,75 +68,128 @@ def prepare_crops_from_roboflow(predictions_dict: dict, base_folder: str) -> Lis
     return crops
 
 def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
-    import threading
-    import time
+    """OCR avec Tesseract - plus stable que EasyOCR dans Docker"""
+    print(f"[OCR] Starting TESSERACT text extraction from {len(crops)} crops")
     
-    print(f"[OCR] Starting text extraction from {len(crops)} crops")
-    
-    try:
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-        print("[OCR] EasyOCR reader created")
-    except Exception as e:
-        print(f"[OCR] Failed to create reader: {e}")
-        return [[] for _ in crops]
+    if not crops:
+        print("[OCR] No crops to process")
+        return []
     
     results = []
     
-    for idx, crop in enumerate(crops):
-        print(f"[OCR] Processing crop {idx + 1}/{len(crops)}")
+    try:
+        import pytesseract
+        print("[OCR] ✅ Tesseract OCR loaded successfully")
         
-        # Variables partagées pour le thread
-        ocr_result = [None]
-        ocr_error = [None]
-        completed = [False]
-        
-        def run_ocr():
+        for idx, crop in enumerate(crops):
             try:
-                print(f"[OCR] Thread started for crop {idx + 1}")
-                ocr_result[0] = reader.readtext(crop)
-                completed[0] = True
-                print(f"[OCR] Thread completed for crop {idx + 1}")
+                print(f"[OCR] Processing crop {idx + 1}/{len(crops)} with Tesseract")
+                
+                # Convertir BGR (OpenCV) vers RGB (PIL)
+                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                pil_img = Image.fromarray(rgb_crop)
+                
+                # Préprocessing pour améliorer l'OCR
+                # 1. Convertir en grayscale
+                gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                
+                # 2. Améliorer le contraste
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                enhanced = clahe.apply(gray_crop)
+                
+                # 3. Appliquer un seuil pour binariser l'image
+                _, thresh_crop = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                
+                # 4. Débruitage
+                kernel = np.ones((2,2), np.uint8)
+                cleaned = cv2.morphologyEx(thresh_crop, cv2.MORPH_CLOSE, kernel)
+                
+                # Convertir en PIL pour Tesseract
+                thresh_pil = Image.fromarray(cleaned)
+                
+                # OCR avec différentes configurations Tesseract
+                configs = [
+                    '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Mot seul, lettres et chiffres
+                    '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Ligne de texte
+                    '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Bloc de texte uniforme
+                    '--psm 13',  # Raw line
+                    '--psm 8',   # Mot seul sans restriction
+                    '--psm 10'   # Caractère seul
+                ]
+                
+                best_text = ""
+                best_conf = 0.0
+                
+                for config_idx, config in enumerate(configs):
+                    try:
+                        # Essayer sur l'image preprocessée
+                        text = pytesseract.image_to_string(thresh_pil, config=config).strip()
+                        
+                        if text and len(text) >= len(best_text):
+                            # Calculer une confiance basée sur la longueur et la configuration
+                            conf = 0.9 - (config_idx * 0.1)  # Première config = meilleure confiance
+                            if len(text) > 1:  # Bonus pour texte plus long
+                                conf += 0.05
+                            
+                            best_text = text
+                            best_conf = max(conf, 0.5)  # Minimum 50%
+                            
+                            print(f"[OCR] Config {config_idx}: '{text}' (conf: {conf:.2f})")
+                            
+                            # Si on trouve quelque chose de satisfaisant, on s'arrête
+                            if len(text) >= 3:
+                                break
+                                
+                    except Exception as e:
+                        print(f"[OCR] Config {config_idx} failed: {e}")
+                        continue
+                
+                # Si rien trouvé avec l'image preprocessée, essayer sur l'originale
+                if not best_text:
+                    try:
+                        print(f"[OCR] Trying original image for crop {idx + 1}")
+                        text = pytesseract.image_to_string(pil_img, config='--psm 8').strip()
+                        if text:
+                            best_text = text
+                            best_conf = 0.7
+                            print(f"[OCR] Original image: '{text}'")
+                    except Exception as e:
+                        print(f"[OCR] Original image OCR failed: {e}")
+                
+                if best_text:
+                    # Nettoyer le texte (supprimer caractères indésirables)
+                    cleaned_text = ''.join(c for c in best_text if c.isalnum() or c.isspace()).strip()
+                    
+                    if cleaned_text:
+                        print(f"[OCR] ✅ Tesseract found: '{cleaned_text}' (confidence: {best_conf:.2f})")
+                        results.append([{
+                            "text": cleaned_text,
+                            "confidence": best_conf,
+                            "bbox": [0, 0, crop.shape[1], 0, crop.shape[1], crop.shape[0], 0, crop.shape[0]]
+                        }])
+                    else:
+                        print(f"[OCR] Text found but empty after cleaning: '{best_text}'")
+                        results.append([])
+                else:
+                    print(f"[OCR] No text found in crop {idx + 1}")
+                    results.append([])
+                    
             except Exception as e:
-                print(f"[OCR] Thread error for crop {idx + 1}: {e}")
-                ocr_error[0] = e
-                completed[0] = True
-        
-        # Lancer OCR dans un thread avec timeout
-        thread = threading.Thread(target=run_ocr)
-        thread.daemon = True
-        thread.start()
-        
-        # Attendre maximum 30 secondes
-        timeout = 30
-        start_time = time.time()
-        
-        while not completed[0] and (time.time() - start_time) < timeout:
-            time.sleep(0.5)
-            print(f"[OCR] Waiting... {time.time() - start_time:.1f}s")
-        
-        if not completed[0]:
-            print(f"[OCR] ⏰ TIMEOUT après {timeout}s pour crop {idx + 1}")
-            results.append([])
-            continue
-        
-        if ocr_error[0]:
-            print(f"[OCR] ❌ Error processing crop {idx + 1}: {ocr_error[0]}")
-            results.append([])
-            continue
-        
-        # Traiter les résultats
-        text_results = ocr_result[0] or []
-        crop_texts = []
-        
-        for bbox, text, confidence in text_results:
-            print(f"[OCR] ✅ Detected text: '{text}' with confidence {confidence}")
-            crop_texts.append({
-                "text": text,
-                "confidence": float(confidence),
-                "bbox": [float(coord) for coord in np.array(bbox).flatten()]
-            })
-        
-        results.append(crop_texts)
+                print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
+                import traceback
+                traceback.print_exc()
+                results.append([])
+                
+    except ImportError:
+        print("[OCR] ❌ Tesseract not available (pytesseract not installed)")
+        results = [[] for _ in crops]
+    except Exception as e:
+        print(f"[OCR] ❌ Tesseract failed: {e}")
+        import traceback
+        traceback.print_exc()
+        results = [[] for _ in crops]
     
-    print(f"[OCR] Completed processing {len(results)} crops")
+    total_detections = sum(len(r) for r in results)
+    print(f"[OCR] ✅ Completed processing {len(results)} crops with {total_detections} text detections")
+    
     return results

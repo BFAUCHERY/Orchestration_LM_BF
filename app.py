@@ -393,7 +393,6 @@ def index():
 
 @app.route('/api/health')
 @app.route('/health')
-@app.route('/health')
 def health_check():
     global OCR_IN_PROGRESS
     if OCR_IN_PROGRESS:
