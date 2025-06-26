@@ -28,8 +28,8 @@ def get_minikube_url(service_name):
 # ------------------------------
 URL = get_minikube_url("yolov8-ocr-service")
 IMAGE_PATH = "test_image.jpg"
-NUM_REQUESTS = 100
-MAX_WORKERS = 10
+NUM_REQUESTS = 4000
+MAX_WORKERS = 100
 # ------------------------------
 
 def send_request(url):

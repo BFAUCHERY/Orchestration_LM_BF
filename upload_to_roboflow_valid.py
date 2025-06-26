@@ -9,7 +9,7 @@ rf = Roboflow(api_key="umHpbGUZiPoJhrKn6T7g")
 workspace = rf.workspace("iabdlmbf")
 project = workspace.project("road-signs-sbjnd")
 
-# 📂 Dossier contenant les .jpg + .txt (plats)
+# Dossier contenant les .jpg + .txt (plats)
 upload_dir = "roboflow_upload/valid"
 tag = "valid"  # ou "test" selon ce que tu veux marquer
 split_name="valid"
