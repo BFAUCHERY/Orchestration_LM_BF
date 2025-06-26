@@ -119,123 +119,142 @@ def preprocess_for_sign_ocr(crop):
     }
 
 def extract_text_from_crops(crops: List[np.ndarray]) -> List[Dict]:
-    """OCR avec Tesseract optimisé pour panneaux de signalisation"""
-    print(f"[OCR] Starting OPTIMIZED TESSERACT text extraction from {len(crops)} crops")
-    
+    """OCR avec EasyOCR (si dispo) ou Tesseract optimisé pour panneaux de signalisation"""
+    print(f"[OCR] Starting OPTIMIZED text extraction from {len(crops)} crops")
+
     if not crops:
         print("[OCR] No crops to process")
         return []
-    
+
     results = []
-    
+
+    import os
     try:
-        import pytesseract
-        print("[OCR] ✅ Tesseract OCR loaded successfully")
-        
+        import easyocr
+        print("🔧 Initialisation du lecteur EasyOCR...")
+        reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=os.getenv("EASYOCR_MODEL_DIR", "/home/kedro_docker/.easyocr"))
+        print("✅ EasyOCR prêt.")
+        # Utilisation d'EasyOCR sur chaque crop
         for idx, crop in enumerate(crops):
             try:
-                print(f"[OCR] Processing crop {idx + 1}/{len(crops)} with advanced preprocessing")
-                
-                # Préprocessing spécialisé
-                processed_images = preprocess_for_sign_ocr(crop)
-                
-                # Configurations Tesseract optimisées pour panneaux
-                configs = [
-                    # Configuration 1: Texte de panneau standard (STOP, YIELD, etc.)
-                    {
-                        'config': '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ ',
-                        'description': 'Mot seul - lettres majuscules seulement'
-                    },
-                    # Configuration 2: Panneaux avec chiffres (vitesse, distances)
-                    {
-                        'config': '--psm 8 -c tessedit_char_whitelist=0123456789KMHMPHABCDEFGHIJKLMNOPQRSTUVWXYZ ',
-                        'description': 'Mot seul - lettres et chiffres'
-                    },
-                    # Configuration 3: Ligne de texte simple
-                    {
-                        'config': '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
-                        'description': 'Ligne de texte'
-                    },
-                    # Configuration 4: Mode caractère par caractère pour texte difficile
-                    {
-                        'config': '--psm 10 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-                        'description': 'Caractère seul'
-                    },
-                    # Configuration 5: Mode permissif pour capturer tout
-                    {
-                        'config': '--psm 8',
-                        'description': 'Mot seul - tous caractères'
-                    },
-                    # Configuration 6: Bloc de texte pour panneaux complexes
-                    {
-                        'config': '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
-                        'description': 'Bloc de texte uniforme'
-                    }
-                ]
-                
-                best_results = []
-                
-                # Tester chaque configuration sur chaque image préprocessée
-                for img_name, img in processed_images.items():
-                    pil_img = Image.fromarray(img)
-                    
-                    for config_data in configs:
-                        try:
-                            text = pytesseract.image_to_string(
-                                pil_img, 
-                                config=config_data['config']
-                            ).strip()
-                            
-                            if text and len(text) > 0:
-                                # Nettoyer le texte
-                                cleaned_text = ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
-                                
-                                if cleaned_text and len(cleaned_text) >= 2:  # Au moins 2 caractères
-                                    # Calculer un score de qualité
-                                    quality_score = calculate_text_quality(cleaned_text, img_name, config_data['description'])
-                                    
-                                    best_results.append({
-                                        'text': cleaned_text,
-                                        'confidence': quality_score,
-                                        'method': f"{img_name}+{config_data['description']}",
-                                        'bbox': [0, 0, crop.shape[1], 0, crop.shape[1], crop.shape[0], 0, crop.shape[0]]
-                                    })
-                                    
-                                    print(f"[OCR] {img_name} + {config_data['description']}: '{cleaned_text}' (score: {quality_score:.2f})")
-                                    
-                        except Exception as e:
-                            continue
-                
-                # Sélectionner le meilleur résultat
-                if best_results:
-                    # Trier par confiance décroissante
-                    best_results.sort(key=lambda x: x['confidence'], reverse=True)
-                    best_result = best_results[0]
-                    
-                    print(f"[OCR] ✅ BEST: '{best_result['text']}' (conf: {best_result['confidence']:.2f}, method: {best_result['method']})")
-                    results.append([best_result])
-                else:
-                    print(f"[OCR] ❌ No text found in crop {idx + 1}")
-                    results.append([])
-                    
+                print(f"🔍 Début du traitement du crop {idx + 1}/{len(crops)}")
+                result = reader.readtext(crop)
+                print(f"📝 Texte détecté: {result}")
+                results.append(result)
             except Exception as e:
-                print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
-                import traceback
-                traceback.print_exc()
+                print(f"❌ Erreur lors du traitement du crop {idx + 1} avec EasyOCR: {e}")
                 results.append([])
-                
-    except ImportError:
-        print("[OCR] ❌ Tesseract not available (pytesseract not installed)")
-        results = [[] for _ in crops]
     except Exception as e:
-        print(f"[OCR] ❌ Tesseract failed: {e}")
-        import traceback
-        traceback.print_exc()
-        results = [[] for _ in crops]
-    
+        print(f"[OCR] ❌ EasyOCR non disponible ou erreur lors de l'initialisation: {e}")
+        print("[OCR] 🔁 Repli sur Tesseract OCR...")
+        try:
+            import pytesseract
+            print("[OCR] ✅ Tesseract OCR loaded successfully")
+
+            for idx, crop in enumerate(crops):
+                try:
+                    print(f"[OCR] Processing crop {idx + 1}/{len(crops)} with advanced preprocessing")
+
+                    # Préprocessing spécialisé
+                    processed_images = preprocess_for_sign_ocr(crop)
+
+                    # Configurations Tesseract optimisées pour panneaux
+                    configs = [
+                        # Configuration 1: Texte de panneau standard (STOP, YIELD, etc.)
+                        {
+                            'config': '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ ',
+                            'description': 'Mot seul - lettres majuscules seulement'
+                        },
+                        # Configuration 2: Panneaux avec chiffres (vitesse, distances)
+                        {
+                            'config': '--psm 8 -c tessedit_char_whitelist=0123456789KMHMPHABCDEFGHIJKLMNOPQRSTUVWXYZ ',
+                            'description': 'Mot seul - lettres et chiffres'
+                        },
+                        # Configuration 3: Ligne de texte simple
+                        {
+                            'config': '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+                            'description': 'Ligne de texte'
+                        },
+                        # Configuration 4: Mode caractère par caractère pour texte difficile
+                        {
+                            'config': '--psm 10 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                            'description': 'Caractère seul'
+                        },
+                        # Configuration 5: Mode permissif pour capturer tout
+                        {
+                            'config': '--psm 8',
+                            'description': 'Mot seul - tous caractères'
+                        },
+                        # Configuration 6: Bloc de texte pour panneaux complexes
+                        {
+                            'config': '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+                            'description': 'Bloc de texte uniforme'
+                        }
+                    ]
+
+                    best_results = []
+
+                    # Tester chaque configuration sur chaque image préprocessée
+                    for img_name, img in processed_images.items():
+                        pil_img = Image.fromarray(img)
+
+                        for config_data in configs:
+                            try:
+                                text = pytesseract.image_to_string(
+                                    pil_img,
+                                    config=config_data['config']
+                                ).strip()
+
+                                if text and len(text) > 0:
+                                    # Nettoyer le texte
+                                    cleaned_text = ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+
+                                    if cleaned_text and len(cleaned_text) >= 2:  # Au moins 2 caractères
+                                        # Calculer un score de qualité
+                                        quality_score = calculate_text_quality(cleaned_text, img_name, config_data['description'])
+
+                                        best_results.append({
+                                            'text': cleaned_text,
+                                            'confidence': quality_score,
+                                            'method': f"{img_name}+{config_data['description']}",
+                                            'bbox': [0, 0, crop.shape[1], 0, crop.shape[1], crop.shape[0], 0, crop.shape[0]]
+                                        })
+
+                                        print(f"[OCR] {img_name} + {config_data['description']}: '{cleaned_text}' (score: {quality_score:.2f})")
+
+                            except Exception as e:
+                                continue
+
+                    # Sélectionner le meilleur résultat
+                    if best_results:
+                        # Trier par confiance décroissante
+                        best_results.sort(key=lambda x: x['confidence'], reverse=True)
+                        best_result = best_results[0]
+
+                        print(f"[OCR] ✅ BEST: '{best_result['text']}' (conf: {best_result['confidence']:.2f}, method: {best_result['method']})")
+                        results.append([best_result])
+                    else:
+                        print(f"[OCR] ❌ No text found in crop {idx + 1}")
+                        results.append([])
+
+                except Exception as e:
+                    print(f"[OCR] ❌ Error processing crop {idx + 1}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    results.append([])
+
+        except ImportError:
+            print("[OCR] ❌ Tesseract not available (pytesseract not installed)")
+            results = [[] for _ in crops]
+        except Exception as e:
+            print(f"[OCR] ❌ Tesseract failed: {e}")
+            import traceback
+            traceback.print_exc()
+            results = [[] for _ in crops]
+
     total_detections = sum(len(r) for r in results)
     print(f"[OCR] ✅ Completed processing {len(results)} crops with {total_detections} text detections")
-    
+
     return results
 
 def calculate_text_quality(text, preprocessing_method, config_description):
