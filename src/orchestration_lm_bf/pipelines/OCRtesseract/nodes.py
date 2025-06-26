@@ -52,9 +52,29 @@ def extract_text(detections) -> list:
     for file in model_dir.glob("**/*"):
         print(f"  - {file.relative_to(model_dir)}")
 
+    required_files = ['craft_mlt_25k.pth', 'english_g2.pth']
+    missing_files = [f for f in required_files if not (model_dir / f).exists()]
+    if missing_files:
+        print(f"❌ Fichiers manquants dans le dossier modèle: {missing_files}")
+        print("🛑 Vérifiez que les modèles ont bien été copiés dans l'image Docker et que les chemins sont corrects.")
+        return []
+
     print("🔧 Initialisation du lecteur EasyOCR...")
-    reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
-    print("✅ EasyOCR prêt.")
+    print("📦 Tentative de création du reader EasyOCR...")
+    try:
+        reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
+        print("✅ Reader EasyOCR initialisé.")
+        print("✅ EasyOCR prêt.")
+        # Vérification des modèles chargés
+        if hasattr(reader, 'detector') and hasattr(reader, 'recognizer'):
+            print("✅ Modèles de détection et de reconnaissance EasyOCR chargés.")
+        else:
+            print("⚠️ Impossible de vérifier le chargement des modèles EasyOCR.")
+    except Exception as e:
+        print(f"❌ Échec de l'initialisation d'EasyOCR: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
     print(f"🔍 Début du traitement de {len(detections)} détection(s)")
     results = []
     for detection in detections:
