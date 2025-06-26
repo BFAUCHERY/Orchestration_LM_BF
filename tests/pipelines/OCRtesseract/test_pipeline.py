@@ -35,7 +35,7 @@ def test_get_detections(fake_image_folder):
     mock_result.boxes.xyxy.cpu().numpy.return_value = np.array([[10, 10, 90, 90]])
     mock_result.boxes.conf.cpu().numpy.return_value = np.array([0.95])
     mock_result.boxes.cls.cpu().numpy.return_value = np.array([1])
-    mock_model.return_value = [mock_result]
+    mock_model.__call__.return_value = [mock_result]
 
     detections = get_detections(mock_model, str(fake_image_folder))
 
