@@ -38,25 +38,36 @@ def is_inside_docker():
         return False
 
 def extract_text(detections) -> list:
+    print("🔍 Début de l'extraction de texte avec EasyOCR")
     if is_inside_docker():
         model_dir = Path("/home/kedro_docker/.easyocr")
     else:
         model_dir = Path("models/easyocr")
+    print(f"📂 Utilisation du dossier modèle: {model_dir}")
 
     model_dir.mkdir(parents=True, exist_ok=True)
+    print("✅ Dossier modèle créé ou déjà existant.")
     print(f"📁 Dossier des modèles EasyOCR: {model_dir.resolve()}")
+    print(f"📁 Contenu du dossier modèle EasyOCR ({model_dir.resolve()}):")
+    for file in model_dir.glob("**/*"):
+        print(f"  - {file.relative_to(model_dir)}")
 
+    print("🔧 Initialisation du lecteur EasyOCR...")
     reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
+    print("✅ EasyOCR prêt.")
+    print(f"🔍 Début du traitement de {len(detections)} détection(s)")
     results = []
-    print(f"Number of detections: {len(detections)}")
     for detection in detections:
         img = cv2.imread(detection['image_path'])
         if img is None:
             print(f"Error reading image: {detection['image_path']}")
             continue
+        print(f"📷 Image chargée: {detection['image_path']}")
         x1, y1, x2, y2 = map(int, detection['boxes'])
         cropped = img[y1:y2, x1:x2]
+        print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
         text_results = reader.readtext(cropped)
+        print(f"📝 Texte détecté: {text_results}")
         clean_text = []
         for bbox, text, confidence in text_results:
             clean_bbox = [float(x) if isinstance(x, (np.floating, np.float32, np.float64)) else float(x) for x in np.array(bbox).flatten()]
@@ -71,5 +82,5 @@ def extract_text(detections) -> list:
             'image_path': detection['image_path'],
             'text': clean_text
         })
-
+    print("✅ Fin de l'extraction de texte.")
     return results
