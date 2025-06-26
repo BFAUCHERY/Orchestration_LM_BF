@@ -12,7 +12,7 @@ def create_pipeline(**kwargs) -> Pipeline:
         node(
             func=extract_text,
             inputs="detections",
-            outputs="ocr_text",
+            outputs="ocr_output",
             name="ocr_extraction_node"
         )
     ])
