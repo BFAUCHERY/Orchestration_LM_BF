@@ -1,5 +1,9 @@
 FROM --platform=linux/amd64 python:3.10
 
+# Prévenir les erreurs matplotlib et Ultralytics en environnement restreint
+ENV MPLCONFIGDIR=/tmp
+ENV YOLO_CONFIG_DIR=/tmp
+
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
 
@@ -18,6 +22,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install uv
+
+# Télécharger les modèles EasyOCR à l'avance
+RUN python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
 
 # install project requirements
 COPY requirements.txt /tmp/requirements.txt
