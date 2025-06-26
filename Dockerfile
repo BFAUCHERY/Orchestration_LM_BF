@@ -36,9 +36,9 @@ RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tm
 
 # Télécharger EasyOCR et les modèles dans le bon dossier directement
 RUN pip install easyocr && \
-    mkdir -p /home/kedro_docker/.EasyOCR && \
-    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.EasyOCR && \
-    chmod -R 755 /home/kedro_docker/.EasyOCR && \
+    mkdir -p /home/kedro_docker/.easyocr && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.easyocr && \
+    chmod -R 755 /home/kedro_docker/.easyocr && \
     python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.EasyOCR')"
 
 # Définir les variables d'environnement pour optimiser les performances
