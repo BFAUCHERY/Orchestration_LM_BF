@@ -50,10 +50,7 @@ jobs:
 
       - name: Run EasyOCR once to cache models
         run: |
-          docker run --rm ludovicmarion/orchestration_lm_bf:latest python -c "
-          import easyocr
-          reader = easyocr.Reader(['fr', 'en'], download_enabled=True)
-          "
+          docker run --rm ludovicmarion/orchestration_lm_bf:latest python -c "import easyocr; easyocr.Reader(['fr', 'en'], download_enabled=True)"
 
       - name: Login to DockerHub
         if: success()
