@@ -1,8 +1,9 @@
-FROM --platform=linux/amd64 python:3.10
+FROM python:3.10
 
 # Prévenir les erreurs matplotlib et Ultralytics en environnement restreint
 ENV MPLCONFIGDIR=/tmp
 ENV YOLO_CONFIG_DIR=/tmp
+ENV TORCH_DISABLE_NNPACK=1
 
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
@@ -27,8 +28,9 @@ RUN pip install uv
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
 
-# Télécharger les modèles EasyOCR à l'avance
-RUN python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
+# Déclencher le téléchargement des modèles EasyOCR après l'installation des dépendances
+RUN python -m pip install git+git://github.com/jaidedai/easyocr.git && \
+    python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
@@ -64,9 +66,6 @@ ARG KEDRO_GID=0
 
 COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
 
-# Copier le fichier kaggle.json si fourni
-COPY kaggle.json /home/kedro_docker/.config/kaggle/kaggle.json
-RUN chmod 600 /home/kedro_docker/.config/kaggle/kaggle.json
 
 # Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
 USER root
@@ -106,3 +105,4 @@ EXPOSE 5001
 RUN echo "📁 Structure des fichiers dans /home/kedro_docker :" && ls -la /home/kedro_docker
 
 CMD ["python", "app.py"]
+# L'OCR tournera en CPU dans le conteneur car GPU (CUDA/MPS) n'est pas supporté dans l'image de base
