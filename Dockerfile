@@ -23,12 +23,12 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install uv
 
-# Télécharger les modèles EasyOCR à l'avance
-RUN python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
-
 # install project requirements
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
+
+# Télécharger les modèles EasyOCR à l'avance
+RUN python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
