@@ -34,14 +34,12 @@ RUN pip install uv
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
 
-# Déclencher le téléchargement des modèles EasyOCR après l'installation des dépendances
-RUN pip install easyocr
-
-# Pré-télécharger les modèles EasyOCR anglais dans le dossier .EasyOCR
-RUN mkdir -p /home/kedro_docker/.EasyOCR && \
+# Télécharger EasyOCR et les modèles dans le bon dossier directement
+RUN pip install easyocr && \
+    mkdir -p /home/kedro_docker/.EasyOCR && \
     chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.EasyOCR && \
     chmod -R 755 /home/kedro_docker/.EasyOCR && \
-    python -c "import easyocr; reader = easyocr.Reader(['en'], download_enabled=True, model_storage_directory='/home/kedro_docker/.EasyOCR')"
+    python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.EasyOCR')"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
@@ -74,10 +72,8 @@ COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
 
 # Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
 USER root
-RUN mkdir -p /home/kedro_docker/.EasyOCR && \
-    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.EasyOCR && \
-    chmod -R 755 /home/kedro_docker/.EasyOCR && \
-    mkdir -p data/01_raw \
+RUN mkdir -p \
+    data/01_raw \
     data/02_intermediate \
     data/02_model \
     data/03_primary \
@@ -111,6 +107,8 @@ EXPOSE 5001
 
 # Vérification du contenu du répertoire
 RUN echo "📁 Structure des fichiers dans /home/kedro_docker :" && ls -la /home/kedro_docker
+
+RUN echo "📁 Modèles EasyOCR téléchargés :" && ls -la /home/kedro_docker/.EasyOCR
 
 CMD ["python", "app.py"]
 # L'OCR tournera en CPU dans le conteneur car GPU (CUDA/MPS) n'est pas supporté dans l'image de base
