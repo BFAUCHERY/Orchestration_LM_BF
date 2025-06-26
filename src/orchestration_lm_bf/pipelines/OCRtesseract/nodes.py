@@ -26,8 +26,27 @@ def get_detections(model, images_folder: str):
     
     return detections
 
+import os
+
+def is_inside_docker():
+    try:
+        if os.path.exists("/.dockerenv"):
+            return True
+        with open("/proc/1/cgroup", "rt") as f:
+            return any("docker" in line for line in f)
+    except FileNotFoundError:
+        return False
+
 def extract_text(detections) -> list:
-    reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=Path("/home/kedro_docker/.easyocr"))
+    if is_inside_docker():
+        model_dir = Path("/home/kedro_docker/.easyocr")
+    else:
+        model_dir = Path("models/easyocr")
+
+    model_dir.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Dossier des modèles EasyOCR: {model_dir.resolve()}")
+
+    reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
     results = []
     print(f"Number of detections: {len(detections)}")
     for detection in detections:
