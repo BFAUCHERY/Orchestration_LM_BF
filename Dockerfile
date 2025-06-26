@@ -29,7 +29,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
 
 # Déclencher le téléchargement des modèles EasyOCR après l'installation des dépendances
-RUN python -m pip install git+git://github.com/jaidedai/easyocr.git && \
+RUN pip install easyocr && \
     python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
 
 # Définir les variables d'environnement pour optimiser les performances
