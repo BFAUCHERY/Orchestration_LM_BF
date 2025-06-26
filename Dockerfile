@@ -22,6 +22,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# add kedro user
+ARG KEDRO_UID=999
+ARG KEDRO_GID=0
+RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
+    useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
+
 RUN pip install uv
 
 # install project requirements
@@ -31,9 +37,11 @@ RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tm
 # Déclencher le téléchargement des modèles EasyOCR après l'installation des dépendances
 RUN pip install easyocr
 
-# Pré-télécharger les modèles EasyOCR anglais dans le dossier .easyocr
-RUN mkdir -p /home/kedro_docker/.easyocr && \
-    python -c "import easyocr; reader = easyocr.Reader(['en'], download_enabled=True); reader.model_storage_directory = '/home/kedro_docker/.easyocr'"
+# Pré-télécharger les modèles EasyOCR anglais dans le dossier .EasyOCR
+RUN mkdir -p /home/kedro_docker/.EasyOCR && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.EasyOCR && \
+    chmod -R 755 /home/kedro_docker/.EasyOCR && \
+    python -c "import easyocr; reader = easyocr.Reader(['en'], download_enabled=True, model_storage_directory='/home/kedro_docker/.EasyOCR')"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
@@ -52,12 +60,6 @@ ENV KAGGLE_CONFIG_DIR=/tmp
 ENV KAGGLE_USERNAME=disabled
 ENV KAGGLE_KEY=disabled
 
-# add kedro user
-ARG KEDRO_UID=999
-ARG KEDRO_GID=0
-RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
-    useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
-
 # Variable d'environnement pour indiquer qu'on est dans Docker
 ENV IN_DOCKER=true
 
@@ -72,7 +74,10 @@ COPY --chown=${KEDRO_UID}:${KEDRO_GID} . .
 
 # Créer les dossiers nécessaires APRÈS la copie et avec les bonnes permissions
 USER root
-RUN mkdir -p data/01_raw \
+RUN mkdir -p /home/kedro_docker/.EasyOCR && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.EasyOCR && \
+    chmod -R 755 /home/kedro_docker/.EasyOCR && \
+    mkdir -p data/01_raw \
     data/02_intermediate \
     data/02_model \
     data/03_primary \
