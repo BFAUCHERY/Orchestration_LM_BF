@@ -29,8 +29,11 @@ COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
 
 # Déclencher le téléchargement des modèles EasyOCR après l'installation des dépendances
-RUN pip install easyocr && \
-    python -c "import easyocr; easyocr.Reader(['en'], download_enabled=True)"
+RUN pip install easyocr
+
+# Pré-télécharger les modèles EasyOCR anglais dans le dossier .easyocr
+RUN mkdir -p /home/kedro_docker/.easyocr && \
+    python -c "import easyocr; reader = easyocr.Reader(['en'], download_enabled=True); reader.model_storage_directory = '/home/kedro_docker/.easyocr'"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
