@@ -39,7 +39,7 @@ RUN pip install easyocr && \
     mkdir -p /home/kedro_docker/.easyocr && \
     chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.easyocr && \
     chmod -R 755 /home/kedro_docker/.easyocr && \
-    python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.EasyOCR')"
+    python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.easyocr')"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
@@ -108,7 +108,7 @@ EXPOSE 5001
 # Vérification du contenu du répertoire
 RUN echo "📁 Structure des fichiers dans /home/kedro_docker :" && ls -la /home/kedro_docker
 
-RUN echo "📁 Modèles EasyOCR téléchargés :" && ls -la /home/kedro_docker/.EasyOCR
+RUN echo "📁 Modèles EasyOCR téléchargés :" && ls -la /home/kedro_docker/.easyocr
 
 CMD ["python", "app.py"]
 # L'OCR tournera en CPU dans le conteneur car GPU (CUDA/MPS) n'est pas supporté dans l'image de base

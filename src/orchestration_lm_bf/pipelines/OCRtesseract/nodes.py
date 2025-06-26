@@ -27,7 +27,7 @@ def get_detections(model, images_folder: str):
     return detections
 
 def extract_text(detections) -> list:
-    reader = easyocr.Reader(['en'], gpu=False, model_storage_directory="/home/kedro_docker/.easyocr")
+    reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=Path("/home/kedro_docker/.easyocr"))
     results = []
     print(f"Number of detections: {len(detections)}")
     for detection in detections:
