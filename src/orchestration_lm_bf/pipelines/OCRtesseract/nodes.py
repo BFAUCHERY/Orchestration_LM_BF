@@ -12,9 +12,9 @@ def get_detections(model, images_folder: str):
         image = Image.open(img_path)
         results = model(image, conf=0.2)
         for result in results:
-            boxes = result.boxes.xyxy.cpu().numpy()
-            scores = result.boxes.conf.cpu().numpy()
-            classes = result.boxes.cls.cpu().numpy()
+            boxes = result.boxes.xyxy.detach().numpy()
+            scores = result.boxes.conf.detach().numpy()
+            classes = result.boxes.cls.detach().numpy()
             for box, score, cls in zip(boxes, scores, classes):
                 detection = {
                     "image_path": str(img_path),
@@ -27,7 +27,7 @@ def get_detections(model, images_folder: str):
     return detections
 
 def extract_text(detections) -> list:
-    reader = easyocr.Reader(['en'])
+    reader = easyocr.Reader(['en'], gpu=False)
     results = []
     print(f"Number of detections: {len(detections)}")
     for detection in detections:
