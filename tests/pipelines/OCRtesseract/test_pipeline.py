@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
+from unittest import mock
 from pathlib import Path
 from PIL import Image
 import numpy as np
