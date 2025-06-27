@@ -60,7 +60,16 @@ def extract_text(detections) -> list:
         return []
 
     try:
-        reader = easyocr.Reader(['en'],  model_storage_directory=str(model_dir))
+        reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
+        # Ajout d'un test immédiat pour vérifier la validité du reader
+        try:
+            dummy = np.zeros((10, 10, 3), dtype=np.uint8)
+            _ = reader.readtext(dummy)
+            print("✅ EasyOCR prêt et opérationnel.")
+        except Exception as test_e:
+            print(f"❌ EasyOCR a échoué lors du test initial: {test_e}")
+            raise test_e
+
         print("✅ Reader EasyOCR initialisé.")
         print("✅ EasyOCR prêt.")
         if hasattr(reader, 'detector') and hasattr(reader, 'recognizer'):

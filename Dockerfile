@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.10-slim
 
 # Prévenir les erreurs matplotlib et Ultralytics en environnement restreint
 ENV MPLCONFIGDIR=/tmp
