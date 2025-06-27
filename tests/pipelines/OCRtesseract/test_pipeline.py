@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import os
 import tempfile
-from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline, get_detections, is_inside_docker, clean_text, extract_text
+from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline, get_detections, clean_text, extract_text
 
 def test_OCRtesseract_pipeline_structure():
     pipeline = create_pipeline()
@@ -25,8 +25,6 @@ def temp_image_file():
         yield tmp.name
         os.unlink(tmp.name)
 
-def test_is_inside_docker_outside():
-    assert is_inside_docker() in [True, False]
 
 def test_clean_text_corrections():
     assert clean_text("CUP") == "STOP"

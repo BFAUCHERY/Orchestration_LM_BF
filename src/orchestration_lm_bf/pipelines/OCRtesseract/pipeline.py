@@ -16,15 +16,9 @@ def create_pipeline(**kwargs) -> Pipeline:
             name="ocr_extraction_node"
         ),
         node(
-            func=is_inside_docker,
-            inputs="",
-            outputs="",
-            name="is_inside_docker"
-        ),
-        node(
             func=clean_text,
-            inputs="",
-            outputs="",
+            inputs=None,
+            outputs=None,
             name="clean_text"
         )
     ])

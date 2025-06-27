@@ -28,15 +28,6 @@ def get_detections(model, images_folder: str):
 
 import os
 
-def is_inside_docker():
-    try:
-        if os.path.exists("/.dockerenv"):
-            return True
-        with open("/proc/1/cgroup", "rt") as f:
-            return any("docker" in line for line in f)
-    except FileNotFoundError:
-        return False
-
 def clean_text(raw_text):
     corrections = {
         "CUP": "STOP",
