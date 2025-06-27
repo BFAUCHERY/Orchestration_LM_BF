@@ -33,10 +33,12 @@ ARG KEDRO_GID=0
 RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
     useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
 
-# Télécharger EasyOCR et les modèles dans le bon dossier directement
-COPY models/easyocr /home/kedro_docker/.easyocr
-RUN chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.easyocr && \
-    chmod -R 755 /home/kedro_docker/.easyocr
+RUN pip install easyocr && \
+    mkdir -p /home/kedro_docker/.easyocr && \
+    chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.easyocr && \
+    chmod -R 755 /home/kedro_docker/.easyocr && \
+    python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.easyocr');"
+
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract

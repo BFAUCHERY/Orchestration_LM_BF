@@ -9,14 +9,14 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v2
         with:
           python-version: '3.10'
 
@@ -25,7 +25,7 @@ jobs:
 
       - name: Set env for Tesseract
         run: echo "TESSERACT_CMD=/usr/bin/tesseract" >> $GITHUB_ENV
-
+        
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -37,23 +37,24 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: |
           mkdir -p ~/.kaggle
-          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.kaggle/kaggle.json
+          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" | tee ~/.kaggle/kaggle.json > ./kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
 
       - name: Run tests with coverage
         run: |
           PYTHONPATH=src pytest tests/ --cov=src
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Build multi-arch Docker image
+        run: |
+          docker buildx create --use --name multiarch_builder || docker buildx use multiarch_builder
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64,linux/arm64 -t ludovicmarion/orchestration_lm_bf:latest --push .
+
+      - name: Run EasyOCR once to cache models
+        run: |
+          docker run --rm ludovicmarion/orchestration_lm_bf:latest python -c "import easyocr; easyocr.Reader(['fr', 'en'], download_enabled=True)"
 
       - name: Login to DockerHub
         if: success()
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Build and push multi-arch image
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64 -t ludovicmarion/orchestration_lm_bf:latest --push .
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
