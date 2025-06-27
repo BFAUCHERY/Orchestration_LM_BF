@@ -57,7 +57,3 @@ jobs:
       - name: Build and push multi-arch image
         run: |
           docker buildx build --platform linux/amd64,linux/arm64 -t ludovicmarion/orchestration_lm_bf:latest --push .
-          
-      - name: Inspect pushed image
-        run: |
-          docker buildx imagetools inspect ludovicmarion/orchestration_lm_bf:latest

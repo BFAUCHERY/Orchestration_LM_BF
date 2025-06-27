@@ -6,22 +6,26 @@ ENV YOLO_CONFIG_DIR=/tmp
 ENV TORCH_DISABLE_NNPACK=1
 ENV TORCH_SHOW_CPP_STACKTRACES=1
 
-# update pip and install uv
-RUN python -m pip install -U "pip>=21.2"
-
-# Installer les dépendances système nécessaires pour OpenCV et OCR
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    tesseract-ocr \
-    tesseract-ocr-eng \
-    libgdal-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Installer les dépendances système nécessaires pour OpenCV et OCR, mettre à jour pip et installer les packages Python
+COPY requirements.txt /tmp/requirements.txt
+RUN apt-get update && \
+    apt-get install -y \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        libgdal-dev \
+        curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    python -m pip install -U "pip>=21.2" && \
+    pip install uv && \
+    pip install --no-cache-dir -r /tmp/requirements.txt && \
+    pip install --no-cache-dir easyocr && \
+    rm -rf /root/.cache /tmp/requirements.txt
 
 # add kedro user
 ARG KEDRO_UID=999
@@ -29,14 +33,7 @@ ARG KEDRO_GID=0
 RUN groupadd -f -g ${KEDRO_GID} kedro_group && \
     useradd -m -d /home/kedro_docker -s /bin/bash -g ${KEDRO_GID} -u ${KEDRO_UID} kedro_docker
 
-RUN pip install uv
-
-# install project requirements
-COPY requirements.txt /tmp/requirements.txt
-RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt && rm -f /tmp/requirements.txt
-
 # Télécharger EasyOCR et les modèles dans le bon dossier directement
-RUN pip install easyocr
 COPY models/easyocr /home/kedro_docker/.easyocr
 RUN chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.easyocr && \
     chmod -R 755 /home/kedro_docker/.easyocr
@@ -104,13 +101,6 @@ USER kedro_docker
 ENV KEDRO_PROJECT_PATH=/home/kedro_docker
 
 EXPOSE 5001
-
-# Vérification du contenu du répertoire
-RUN echo "📁 Structure des fichiers dans /home/kedro_docker :" && ls -la /home/kedro_docker
-
-RUN echo "📁 Modèles EasyOCR téléchargés :" && ls -la /home/kedro_docker/.easyocr
-
-RUN echo "🔍 Vérification du contenu de /home/kedro_docker/.easyocr :" && find /home/kedro_docker/.easyocr
 
 CMD ["python", "app.py"]
 # L'OCR tournera en CPU dans le conteneur car GPU (CUDA/MPS) n'est pas supporté dans l'image de base
