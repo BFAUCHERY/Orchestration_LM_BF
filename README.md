@@ -99,3 +99,63 @@ To automatically strip out all output cell contents before committing to `git`, 
 ## Package your Kedro project
 
 [Further information about building project documentation and packaging your project](https://docs.kedro.org/en/stable/tutorial/package_a_project.html)
+
+# 🚀 Orchestration_LM_BF
+
+[![Powered by Kedro](https://img.shields.io/badge/powered_by-kedro-ffc900?logo=kedro)](https://kedro.org)
+
+Ce document décrit comment cloner, exécuter, tester et packager le projet avec Kedro, Docker et GitHub Actions.
+
+---
+
+## 1️⃣ Initialiser le dépôt Git
+
+```bash
+git init
+git remote add origin https://github.com/BFAUCHERY/Orchestration_LM_BF.git
+git pull origin main
+```
+
+---
+
+## 2️⃣ Activer github actions / push des modifications
+
+Les workflows GitHub Actions sont automatiquement déclenchés lors des pushes.
+
+```bash
+git add .
+git commit -m "Mise à jour du projet"
+git push origin main
+```
+
+🔗 **Voir l'état des actions :**
+👉 [GitHub Actions](https://github.com/BFAUCHERY/Orchestration_LM_BF/actions)
+
+---
+
+## 3️⃣ Mettre à jour l'image Docker et relancer le conteneur
+
+```bash
+docker pull ludovicmarion/orchestration_lm_bf:latest
+docker run -p 5001:5001 ludovicmarion/orchestration_lm_bf:latest```
+
+---
+
+## 4️⃣ Exécuter les tests
+
+```bash
+pytest --cov=src --cov-fail-under=80
+```
+
+---
+
+## 5️⃣ Lancer le pipeline Kedro
+
+```bash
+kedro run
+```
+
+---
+
+✅ **Notes**
+- Les dépendances sont dans `requirements.txt` (installer via `pip install -r requirements.txt`)
