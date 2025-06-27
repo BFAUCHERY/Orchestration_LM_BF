@@ -37,99 +37,70 @@ def is_inside_docker():
     except FileNotFoundError:
         return False
 
+def clean_text(raw_text):
+    corrections = {
+        "CUP": "STOP",
+        "5TOP": "STOP",
+        "ST0P": "STOP",
+        "SIOP": "STOP",
+        "STOPP": "STOP",
+    }
+    text = corrections.get(raw_text, raw_text)
+    if text.isdigit():
+        return text
+    digits = ''.join(filter(str.isdigit, text))
+    if digits:
+        return digits
+    return text
+
 def extract_text(detections) -> list:
-    print("🔍 Début de l'extraction de texte avec EasyOCR")
-    if is_inside_docker():
-        model_dir = Path("/home/kedro_docker/.easyocr")
-    else:
-        model_dir = Path("models/easyocr")
-    print(f"📂 Utilisation du dossier modèle: {model_dir}")
+    print("🔍 Début de l'extraction de texte avec Tesseract")
+    import pytesseract
+    results = []
+    for detection in detections:
+        img = cv2.imread(detection['image_path'])
+        if img is None:
+            print(f"Error reading image: {detection['image_path']}")
+            continue
+        print(f"📷 Image chargée: {detection['image_path']}")
+        x1, y1, x2, y2 = map(int, detection['boxes'])
+        cropped = img[y1:y2, x1:x2]
+        print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
 
-    model_dir.mkdir(parents=True, exist_ok=True)
-    print("✅ Dossier modèle créé ou déjà existant.")
-    print(f"📁 Dossier des modèles EasyOCR: {model_dir.resolve()}")
-    print(f"📁 Contenu du dossier modèle EasyOCR ({model_dir.resolve()}):")
-    for file in model_dir.glob("**/*"):
-        print(f"  - {file.relative_to(model_dir)}")
+        # Pré-traitement pour améliorer l'OCR
+        gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+        thresh = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 11, 2
+        )
 
-    required_files = ['craft_mlt_25k.pth', 'english_g2.pth']
-    missing_files = [f for f in required_files if not (model_dir / f).exists()]
-    if missing_files:
-        print(f"❌ Fichiers manquants dans le dossier modèle: {missing_files}")
-        print("🛑 Vérifiez que les modèles ont bien été copiés dans l'image Docker et que les chemins sont corrects.")
-        return []
+        # Tesseract config
+        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        text = pytesseract.image_to_string(thresh, config=custom_config).strip().upper()
+        print(f"📝 Texte détecté (Tesseract): {text}")
+        cleaned_text = clean_text(text)
+        print(f"🧹 Texte nettoyé : {cleaned_text}")
 
-    try:
-        reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
-        # Ajout d'un test immédiat pour vérifier la validité du reader
-        try:
-            dummy = np.zeros((10, 10, 3), dtype=np.uint8)
-            _ = reader.readtext(dummy)
-            print("✅ EasyOCR prêt et opérationnel.")
-        except Exception as test_e:
-            print(f"❌ EasyOCR a échoué lors du test initial: {test_e}")
-            raise test_e
-
-        print("✅ Reader EasyOCR initialisé.")
-        print("✅ EasyOCR prêt.")
-        if hasattr(reader, 'detector') and hasattr(reader, 'recognizer'):
-            print("✅ Modèles de détection et de reconnaissance EasyOCR chargés.")
+        # Confiance en fonction du texte
+        confidence = 0.0
+        if cleaned_text == "STOP":
+            confidence = 0.95
+        elif cleaned_text in {"30", "50", "70", "90", "110", "130"}:
+            confidence = 0.90
+        elif cleaned_text.isdigit() and len(cleaned_text) <= 3:
+            confidence = 0.85
+        elif any(char.isdigit() for char in cleaned_text):
+            confidence = 0.75
         else:
-            print("⚠️ Impossible de vérifier le chargement des modèles EasyOCR.")
-        
-        print(f"🔍 Début du traitement de {len(detections)} détection(s)")
-        results = []
-        for detection in detections:
-            img = cv2.imread(detection['image_path'])
-            if img is None:
-                print(f"Error reading image: {detection['image_path']}")
-                continue
-            print(f"📷 Image chargée: {detection['image_path']}")
-            x1, y1, x2, y2 = map(int, detection['boxes'])
-            cropped = img[y1:y2, x1:x2]
-            print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
-            text_results = reader.readtext(cropped)
-            print(f"📝 Texte détecté: {text_results}")
-            clean_text = []
-            for bbox, text, confidence in text_results:
-                clean_bbox = [float(x) if isinstance(x, (np.floating, np.float32, np.float64)) else float(x) for x in np.array(bbox).flatten()]
-                clean_confidence = float(confidence)
-                clean_text.append({
-                    'bbox': clean_bbox,
-                    'text': text,
-                    'confidence': clean_confidence
-                })
-            results.append({
-                'image_path': detection['image_path'],
-                'text': clean_text
-            })
-        print("✅ Fin de l'extraction de texte.")
-        return results
-    except Exception as e:
-        print(f"❌ Échec de l'initialisation ou de l'exécution d'EasyOCR: {e}")
-        import traceback
-        traceback.print_exc()
-        print("🔁 Bascule vers Tesseract OCR...")
-        import pytesseract
-        results = []
-        for detection in detections:
-            img = cv2.imread(detection['image_path'])
-            if img is None:
-                print(f"Error reading image: {detection['image_path']}")
-                continue
-            print(f"📷 Image chargée: {detection['image_path']}")
-            x1, y1, x2, y2 = map(int, detection['boxes'])
-            cropped = img[y1:y2, x1:x2]
-            print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
-            text = pytesseract.image_to_string(cropped)
-            print(f"📝 Texte détecté (Tesseract): {text.strip()}")
-            results.append({
-                'image_path': detection['image_path'],
-                'text': [{
-                    'bbox': [float(x1), float(y1), float(x2), float(y2)],
-                    'text': text.strip(),
-                    'confidence': None
-                }]
-            })
-        print("✅ Fin de l'extraction de texte (Tesseract).")
-        return results
+            confidence = 0.50 if cleaned_text else 0.0
+
+        results.append({
+            'image_path': detection['image_path'],
+            'text': [{
+                'bbox': [float(x1), float(y1), float(x2), float(y2)],
+                'text': cleaned_text,
+                'confidence': confidence
+            }]
+        })
+    print("✅ Fin de l'extraction de texte avec Tesseract.")
+    return results
