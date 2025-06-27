@@ -6,8 +6,7 @@ import numpy as np
 import cv2
 import os
 import tempfile
-from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import get_detections, is_inside_docker, clean_text, extract_text
-from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline
+from orchestration_lm_bf.pipelines.OCRtesseract.pipeline import create_pipeline, get_detections, is_inside_docker, clean_text, extract_text
 
 def test_OCRtesseract_pipeline_structure():
     pipeline = create_pipeline()
