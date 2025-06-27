@@ -59,18 +59,45 @@ def extract_text(detections) -> list:
         print("🛑 Vérifiez que les modèles ont bien été copiés dans l'image Docker et que les chemins sont corrects.")
         return []
 
-    print("🔧 Initialisation du lecteur EasyOCR...")
-    print("📦 Tentative de création du reader EasyOCR...")
     try:
-        reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
+        reader = easyocr.Reader(['en'],  model_storage_directory=str(model_dir))
         print("✅ Reader EasyOCR initialisé.")
         print("✅ EasyOCR prêt.")
         if hasattr(reader, 'detector') and hasattr(reader, 'recognizer'):
             print("✅ Modèles de détection et de reconnaissance EasyOCR chargés.")
         else:
             print("⚠️ Impossible de vérifier le chargement des modèles EasyOCR.")
+        
+        print(f"🔍 Début du traitement de {len(detections)} détection(s)")
+        results = []
+        for detection in detections:
+            img = cv2.imread(detection['image_path'])
+            if img is None:
+                print(f"Error reading image: {detection['image_path']}")
+                continue
+            print(f"📷 Image chargée: {detection['image_path']}")
+            x1, y1, x2, y2 = map(int, detection['boxes'])
+            cropped = img[y1:y2, x1:x2]
+            print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
+            text_results = reader.readtext(cropped)
+            print(f"📝 Texte détecté: {text_results}")
+            clean_text = []
+            for bbox, text, confidence in text_results:
+                clean_bbox = [float(x) if isinstance(x, (np.floating, np.float32, np.float64)) else float(x) for x in np.array(bbox).flatten()]
+                clean_confidence = float(confidence)
+                clean_text.append({
+                    'bbox': clean_bbox,
+                    'text': text,
+                    'confidence': clean_confidence
+                })
+            results.append({
+                'image_path': detection['image_path'],
+                'text': clean_text
+            })
+        print("✅ Fin de l'extraction de texte.")
+        return results
     except Exception as e:
-        print(f"❌ Échec de l'initialisation d'EasyOCR: {e}")
+        print(f"❌ Échec de l'initialisation ou de l'exécution d'EasyOCR: {e}")
         import traceback
         traceback.print_exc()
         print("🔁 Bascule vers Tesseract OCR...")
@@ -97,32 +124,3 @@ def extract_text(detections) -> list:
             })
         print("✅ Fin de l'extraction de texte (Tesseract).")
         return results
-    print(f"🔍 Début du traitement de {len(detections)} détection(s)")
-    results = []
-    for detection in detections:
-        img = cv2.imread(detection['image_path'])
-        if img is None:
-            print(f"Error reading image: {detection['image_path']}")
-            continue
-        print(f"📷 Image chargée: {detection['image_path']}")
-        x1, y1, x2, y2 = map(int, detection['boxes'])
-        cropped = img[y1:y2, x1:x2]
-        print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
-        text_results = reader.readtext(cropped)
-        print(f"📝 Texte détecté: {text_results}")
-        clean_text = []
-        for bbox, text, confidence in text_results:
-            clean_bbox = [float(x) if isinstance(x, (np.floating, np.float32, np.float64)) else float(x) for x in np.array(bbox).flatten()]
-            clean_confidence = float(confidence)
-            clean_text.append({
-                'bbox': clean_bbox,
-                'text': text,
-                'confidence': clean_confidence
-            })
-        
-        results.append({
-            'image_path': detection['image_path'],
-            'text': clean_text
-        })
-    print("✅ Fin de l'extraction de texte.")
-    return results
