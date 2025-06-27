@@ -44,17 +44,18 @@ jobs:
         run: |
           PYTHONPATH=src pytest tests/ --cov=src
 
-      - name: Build multi-arch Docker image
+      - name: Build and push Docker image
         run: |
-          docker buildx create --use --name multiarch_builder || docker buildx use multiarch_builder
-          docker buildx inspect --bootstrap
-          docker buildx build --platform linux/amd64,linux/arm64 -t ludovicmarion/orchestration_lm_bf:latest --push .
+          docker build --platform linux/amd64 -t ludovicmarion/orchestration_lm_bf:amd64 .
+          docker build --platform linux/arm64 -t ludovicmarion/orchestration_lm_bf:arm64 .
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker push ludovicmarion/orchestration_lm_bf:amd64
+          docker push ludovicmarion/orchestration_lm_bf:arm64
+          docker manifest create ludovicmarion/orchestration_lm_bf:latest \
+            ludovicmarion/orchestration_lm_bf:amd64 \
+            ludovicmarion/orchestration_lm_bf:arm64
+          docker manifest push ludovicmarion/orchestration_lm_bf:latest
 
       - name: Run EasyOCR once to cache models
         run: |
           docker run --rm ludovicmarion/orchestration_lm_bf:latest python -c "import easyocr; easyocr.Reader(['fr', 'en'], download_enabled=True)"
-
-      - name: Login to DockerHub
-        if: success()
-        run: |
-          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
