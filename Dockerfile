@@ -4,6 +4,7 @@ FROM python:3.10-slim
 ENV MPLCONFIGDIR=/tmp
 ENV YOLO_CONFIG_DIR=/tmp
 ENV TORCH_DISABLE_NNPACK=1
+ENV TORCH_SHOW_CPP_STACKTRACES=1
 
 # update pip and install uv
 RUN python -m pip install -U "pip>=21.2"
@@ -39,7 +40,7 @@ RUN pip install easyocr && \
     mkdir -p /home/kedro_docker/.easyocr && \
     chown -R ${KEDRO_UID}:${KEDRO_GID} /home/kedro_docker/.easyocr && \
     chmod -R 755 /home/kedro_docker/.easyocr && \
-    python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.easyocr')"
+    python -c "import easyocr; reader = easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='/home/kedro_docker/.easyocr'); print('✅ EasyOCR models downloaded.')"
 
 # Définir les variables d'environnement pour optimiser les performances
 ENV TESSERACT_CMD=/usr/bin/tesseract
@@ -109,6 +110,8 @@ EXPOSE 5001
 RUN echo "📁 Structure des fichiers dans /home/kedro_docker :" && ls -la /home/kedro_docker
 
 RUN echo "📁 Modèles EasyOCR téléchargés :" && ls -la /home/kedro_docker/.easyocr
+
+RUN echo "🔍 Vérification du contenu de /home/kedro_docker/.easyocr :" && find /home/kedro_docker/.easyocr
 
 CMD ["python", "app.py"]
 # L'OCR tournera en CPU dans le conteneur car GPU (CUDA/MPS) n'est pas supporté dans l'image de base

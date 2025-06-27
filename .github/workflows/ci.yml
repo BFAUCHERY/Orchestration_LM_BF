@@ -13,10 +13,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
@@ -25,7 +25,7 @@ jobs:
 
       - name: Set env for Tesseract
         run: echo "TESSERACT_CMD=/usr/bin/tesseract" >> $GITHUB_ENV
-        
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -37,27 +37,27 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: |
           mkdir -p ~/.kaggle
-          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" | tee ~/.kaggle/kaggle.json > ./kaggle.json
+          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\", \"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.kaggle/kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
 
       - name: Run tests with coverage
         run: |
           PYTHONPATH=src pytest tests/ --cov=src
 
-      - name: Build Docker image
-        run: |
-          docker build -t ludovicmarion/orchestration_lm_bf:latest .
-
-      - name: Run EasyOCR once to cache models
-        run: |
-          docker run --rm ludovicmarion/orchestration_lm_bf:latest python -c "import easyocr; easyocr.Reader(['fr', 'en'], download_enabled=True)"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to DockerHub
         if: success()
-        run: |
-          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Push Docker image
-        if: success()
+      - name: Build and push multi-arch image
         run: |
-          docker push ludovicmarion/orchestration_lm_bf:latest
+          docker buildx build --platform linux/amd64,linux/arm64 -t ludovicmarion/orchestration_lm_bf:latest --push .
+          
+      - name: Inspect pushed image
+        run: |
+          docker buildx imagetools inspect ludovicmarion/orchestration_lm_bf:latest
