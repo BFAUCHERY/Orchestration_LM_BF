@@ -6,6 +6,9 @@
 raw_images:
   type: MemoryDataset
 
+ocr_clean:
+  type: MemoryDataset
+
 train_images:
   type: yaml.YAMLDataset
   filepath: data/01_raw/data.yaml
@@ -47,7 +50,7 @@ detections:
   filepath: data/03_primary/detected_panels.pkl
 
 model:
-  type: orchestration_lm_bf.datasets.yolo_model_dataset.YOLOModelDataset
+  type: pickle.PickleDataset
   filepath: model/yolov8n.pt
 
 yolo_predictions:

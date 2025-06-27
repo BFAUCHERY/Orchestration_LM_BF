@@ -17,8 +17,8 @@ def create_pipeline(**kwargs) -> Pipeline:
         ),
         node(
             func=clean_text,
-            inputs=None,
-            outputs=None,
-            name="clean_text"
+            inputs="ocr_clean",
+            outputs="ocr_clean",
+            name="clean_text_node"
         )
     ])
