@@ -65,7 +65,6 @@ def extract_text(detections) -> list:
         reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=str(model_dir))
         print("✅ Reader EasyOCR initialisé.")
         print("✅ EasyOCR prêt.")
-        # Vérification des modèles chargés
         if hasattr(reader, 'detector') and hasattr(reader, 'recognizer'):
             print("✅ Modèles de détection et de reconnaissance EasyOCR chargés.")
         else:
@@ -74,7 +73,30 @@ def extract_text(detections) -> list:
         print(f"❌ Échec de l'initialisation d'EasyOCR: {e}")
         import traceback
         traceback.print_exc()
-        return []
+        print("🔁 Bascule vers Tesseract OCR...")
+        import pytesseract
+        results = []
+        for detection in detections:
+            img = cv2.imread(detection['image_path'])
+            if img is None:
+                print(f"Error reading image: {detection['image_path']}")
+                continue
+            print(f"📷 Image chargée: {detection['image_path']}")
+            x1, y1, x2, y2 = map(int, detection['boxes'])
+            cropped = img[y1:y2, x1:x2]
+            print(f"✂️  Image rognée aux coordonnées: {(x1, y1, x2, y2)}")
+            text = pytesseract.image_to_string(cropped)
+            print(f"📝 Texte détecté (Tesseract): {text.strip()}")
+            results.append({
+                'image_path': detection['image_path'],
+                'text': [{
+                    'bbox': [float(x1), float(y1), float(x2), float(y2)],
+                    'text': text.strip(),
+                    'confidence': None
+                }]
+            })
+        print("✅ Fin de l'extraction de texte (Tesseract).")
+        return results
     print(f"🔍 Début du traitement de {len(detections)} détection(s)")
     results = []
     for detection in detections:
