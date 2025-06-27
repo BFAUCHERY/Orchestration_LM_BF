@@ -1,5 +1,5 @@
 from kedro.pipeline import Pipeline, node, pipeline
-from .nodes import extract_text, get_detections,is_inside_docker,clean_text
+from .nodes import extract_text, get_detections,clean_text
 
 def create_pipeline(**kwargs) -> Pipeline:
     return pipeline([
